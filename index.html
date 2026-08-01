@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>中文跟读录音练习</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      max-width: 680px;
+      margin: 0 auto;
+      padding: 24px;
+      background: #f6f7fb;
+      color: #222;
+    }
+    .card {
+      background: white;
+      border-radius: 18px;
+      padding: 24px;
+      box-shadow: 0 8px 24px rgba(0,0,0,.08);
+    }
+    h1 { font-size: 1.6rem; margin-top: 0; }
+    label { display: block; font-weight: 700; margin-bottom: 8px; }
+    textarea {
+      width: 100%;
+      min-height: 90px;
+      box-sizing: border-box;
+      font-size: 1.35rem;
+      padding: 12px;
+      border: 1px solid #bbb;
+      border-radius: 12px;
+      resize: vertical;
+    }
+    .sentence {
+      margin: 22px 0;
+      padding: 18px;
+      background: #eef3ff;
+      border-radius: 14px;
+      font-size: 2rem;
+      text-align: center;
+    }
+    .buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin: 16px 0;
+    }
+    button, a.download {
+      border: 0;
+      border-radius: 12px;
+      padding: 12px 18px;
+      font-size: 1rem;
+      cursor: pointer;
+      text-decoration: none;
+      background: #2657d6;
+      color: white;
+    }
+    button:disabled {
+      opacity: .45;
+      cursor: not-allowed;
+    }
+    #stopBtn { background: #c62828; }
+    #resetBtn { background: #666; }
+    #status {
+      min-height: 24px;
+      font-weight: 700;
+      margin-top: 8px;
+    }
+    audio {
+      width: 100%;
+      margin-top: 14px;
+    }
+    .note {
+      font-size: .9rem;
+      color: #555;
+      line-height: 1.5;
+      margin-top: 18px;
+    }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <h1>中文跟读录音练习</h1>
+
+    <label for="sentenceInput">老师输入练习句子</label>
+    <textarea id="sentenceInput">我喜欢学习中文。</textarea>
+
+    <div class="sentence" id="sentenceDisplay">我喜欢学习中文。</div>
+
+    <div class="buttons">
+      <button id="showBtn">显示句子</button>
+      <button id="recordBtn">🎤 开始录音</button>
+      <button id="stopBtn" disabled>⏹ 停止录音</button>
+      <button id="resetBtn">重新录音</button>
+    </div>
+
+    <div id="status" aria-live="polite">准备就绪</div>
+
+    <audio id="audioPlayer" controls hidden></audio>
+
+    <div class="buttons">
+      <a id="downloadLink" class="download" hidden>下载录音</a>
+    </div>
+
+    <p class="note">
+      第一次录音时，浏览器会询问是否允许使用麦克风。请选择“允许”。
+      为保护隐私，这个版本不会把录音上传到网络；录音只保存在当前设备的浏览器中。
+    </p>
+  </main>
+
+  <script>
+    const sentenceInput = document.getElementById("sentenceInput");
+    const sentenceDisplay = document.getElementById("sentenceDisplay");
+    const showBtn = document.getElementById("showBtn");
+    const recordBtn = document.getElementById("recordBtn");
+    const stopBtn = document.getElementById("stopBtn");
+    const resetBtn = document.getElementById("resetBtn");
+    const statusText = document.getElementById("status");
+    const audioPlayer = document.getElementById("audioPlayer");
+    const downloadLink = document.getElementById("downloadLink");
+
+    let mediaRecorder = null;
+    let audioChunks = [];
+    let microphoneStream = null;
+    let currentAudioUrl = null;
+
+    showBtn.addEventListener("click", () => {
+      const sentence = sentenceInput.value.trim();
+      sentenceDisplay.textContent = sentence || "请输入一个句子。";
+    });
+
+    recordBtn.addEventListener("click", async () => {
+      try {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          throw new Error("这个浏览器不支持麦克风录音。请尝试最新版 Safari、Chrome 或 Edge。");
+        }
+
+        microphoneStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+        const options = {};
+        if (MediaRecorder.isTypeSupported("audio/webm;codecs=opus")) {
+          options.mimeType = "audio/webm;codecs=opus";
+        } else if (MediaRecorder.isTypeSupported("audio/mp4")) {
+          options.mimeType = "audio/mp4";
+        }
+
+        mediaRecorder = new MediaRecorder(microphoneStream, options);
+        audioChunks = [];
+
+        mediaRecorder.addEventListener("dataavailable", event => {
+          if (event.data.size > 0) {
+            audioChunks.push(event.data);
+          }
+        });
+
+        mediaRecorder.addEventListener("stop", () => {
+          const mimeType = mediaRecorder.mimeType || "audio/webm";
+          const audioBlob = new Blob(audioChunks, { type: mimeType });
+
+          if (currentAudioUrl) {
+            URL.revokeObjectURL(currentAudioUrl);
+          }
+
+          currentAudioUrl = URL.createObjectURL(audioBlob);
+          audioPlayer.src = currentAudioUrl;
+          audioPlayer.hidden = false;
+
+          const extension = mimeType.includes("mp4") ? "m4a" : "webm";
+          downloadLink.href = currentAudioUrl;
+          downloadLink.download = `中文跟读-${Date.now()}.${extension}`;
+          downloadLink.hidden = false;
+
+          microphoneStream.getTracks().forEach(track => track.stop());
+          microphoneStream = null;
+
+          statusText.textContent = "录音完成。可以回放或下载。";
+          recordBtn.disabled = false;
+          stopBtn.disabled = true;
+        });
+
+        mediaRecorder.start();
+        statusText.textContent = "正在录音……";
+        recordBtn.disabled = true;
+        stopBtn.disabled = false;
+        audioPlayer.hidden = true;
+        downloadLink.hidden = true;
+      } catch (error) {
+        console.error(error);
+        statusText.textContent =
+          error.name === "NotAllowedError"
+            ? "麦克风权限被拒绝。请在浏览器设置中允许麦克风。"
+            : error.message || "无法开始录音。";
+      }
+    });
+
+    stopBtn.addEventListener("click", () => {
+      if (mediaRecorder && mediaRecorder.state === "recording") {
+        mediaRecorder.stop();
+      }
+    });
+
+    resetBtn.addEventListener("click", () => {
+      if (mediaRecorder && mediaRecorder.state === "recording") {
+        mediaRecorder.stop();
+      }
+
+      if (currentAudioUrl) {
+        URL.revokeObjectURL(currentAudioUrl);
+        currentAudioUrl = null;
+      }
+
+      audioPlayer.removeAttribute("src");
+      audioPlayer.hidden = true;
+      downloadLink.hidden = true;
+      statusText.textContent = "已清除，可以重新录音。";
+    });
+  </script>
+</body>
+</html>
