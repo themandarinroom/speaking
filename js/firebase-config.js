@@ -1,9 +1,8 @@
-// Firebase web configuration is public by design.
-export const firebaseConfig = {
-  apiKey: "你的 apiKey",
+const firebaseConfig = {
+  apiKey: "AIzaSyAFqL3XTgZaL-w2G0UIJ3TVTqY1j1n7y24",
   authDomain: "the-mandarin-room.firebaseapp.com",
   projectId: "the-mandarin-room",
   storageBucket: "the-mandarin-room.firebasestorage.app",
-  messagingSenderId: "你的 messagingSenderId",
-  appId: "你的 appId"
+  messagingSenderId: "940574313978",
+  appId: "1:940574313978:web:24db38b28ec255c63de843"
 };
