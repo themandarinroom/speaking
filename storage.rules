@@ -1,0 +1,31 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    function validRoom(roomId) {
+      return roomId in ['6B', '6D', '5C', '5E', '4B', '4C', '4D', '3A', '3B'];
+    }
+
+    function isAuthorisedTeacher() {
+      return request.auth != null
+        && request.auth.token.email_verified == true
+        && firestore.exists(/databases/(default)/documents/authorizedTeachers/$(request.auth.uid))
+        && firestore.get(/databases/(default)/documents/authorizedTeachers/$(request.auth.uid)).data.active == true;
+    }
+
+    match /teacher-audio/{roomId}/{fileName} {
+      allow read: if validRoom(roomId);
+      allow create, update: if validRoom(roomId)
+        && fileName == 'model-audio'
+        && isAuthorisedTeacher()
+        && request.resource.size < 10 * 1024 * 1024
+        && request.resource.contentType.matches('audio/.*');
+      allow delete: if validRoom(roomId)
+        && fileName == 'model-audio'
+        && isAuthorisedTeacher();
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
