@@ -3,10 +3,11 @@ import { LocalRecorder } from "./recorder.js";
 import { speakMandarin } from "./speech.js";
 import { getFirebaseServices, isFirebaseConfigured } from "./firebase.js";
 import { isValidRoomId, normalizeRoomId } from "./rooms.js";
+import { loadRoomTeacherAudio } from "./storage.js";
 import { initPageTranslations, applyTranslations, formatText, t } from "./translations.js";
 
 let practice = normalizePractice(null);
-let teacherAudioUrl = "";
+let localTeacherAudio = "";
 let selectedId = null;
 let selectedVoice = "ai";
 let studentAudioUrl = "";
@@ -55,7 +56,9 @@ function showPractice(liveUpdate = false) {
   roomEntry.hidden = true; waitingScreen.hidden = true; practiceContent.hidden = false;
   roomBadge.textContent = formatText("roomLabel", { room: roomId });
   renderSentence(); configureVoiceChoices();
-  if (liveUpdate) status.textContent = t("liveUpdate");
+  if (practice.settings.modelAudio === "teacher" && !localTeacherAudio) status.textContent = t("teacherRecordingUnavailable");
+  else if (liveUpdate) status.textContent = t("liveUpdate");
+  else if (!studentAudioUrl) status.textContent = t("ready");
 }
 
 function renderSentence() {
@@ -86,9 +89,9 @@ function renderMeaning() {
 document.addEventListener("click", event => { if (!event.target.closest(".word-unit")) updateSelection(null); });
 
 function configureVoiceChoices() {
-  const allowChoice = practice.settings.modelAudio === "choice" && teacherAudioUrl;
+  const allowChoice = practice.settings.modelAudio === "choice" && localTeacherAudio;
   voiceChoices.hidden = !allowChoice;
-  if (practice.settings.modelAudio === "teacher" && teacherAudioUrl) selectedVoice = "teacher";
+  if (practice.settings.modelAudio === "teacher") selectedVoice = "teacher";
   else if (!allowChoice) selectedVoice = "ai";
   voiceChoices.querySelectorAll("button[data-voice]").forEach(button => button.classList.toggle("active", button.dataset.voice === selectedVoice));
 }
@@ -97,9 +100,13 @@ voiceChoices.addEventListener("click", event => { const button = event.target.cl
 
 listenBtn.addEventListener("click", async () => {
   try {
-    if (selectedVoice === "teacher" && teacherAudioUrl) { modelAudio.src = teacherAudioUrl; modelAudio.currentTime = 0; await modelAudio.play(); }
-    else speakMandarin(practice.words, practice.settings.speechRate || 0.8);
-    status.textContent = t("listening");
+    if (selectedVoice === "teacher" && localTeacherAudio) {
+      modelAudio.src = localTeacherAudio; modelAudio.currentTime = 0; await modelAudio.play(); status.textContent = t("listening");
+    } else if (selectedVoice === "teacher") {
+      speakMandarin(practice.words, practice.settings.speechRate || 0.8); status.textContent = t("teacherRecordingUnavailable");
+    } else {
+      speakMandarin(practice.words, practice.settings.speechRate || 0.8); status.textContent = t("listening");
+    }
   } catch (error) { status.textContent = t(error.message === "speechUnsupported" ? "speechUnsupported" : "playbackFailed"); }
 });
 
@@ -132,7 +139,7 @@ async function subscribeToRoom() {
     unsubscribeRoom = services.firestoreSdk.onSnapshot(roomRef, snapshot => {
       if (!snapshot.exists() || snapshot.data().published !== true) { receivedPractice = false; showWaiting(); return; }
       const wasLoaded = receivedPractice; const data = snapshot.data();
-      practice = roomDataToPractice(data); teacherAudioUrl = String(data.teacherAudioUrl || ""); selectedId = null; receivedPractice = true; showPractice(wasLoaded);
+      practice = roomDataToPractice(data); localTeacherAudio = loadRoomTeacherAudio(roomId); selectedId = null; receivedPractice = true; showPractice(wasLoaded);
     }, error => {
       console.error(error);
       if (error.code === "permission-denied") showWaiting(); else showWaiting("connectionError");
@@ -145,7 +152,6 @@ function rerenderLanguage() {
   if (!roomId || !isValidRoomId(roomId)) showRoomEntry(roomId ? "invalidRoom" : "");
   else if (receivedPractice) showPractice(false);
   else showWaiting();
-  if (!studentAudioUrl && receivedPractice) status.textContent = t("ready");
 }
 
 window.addEventListener("beforeunload", () => unsubscribeRoom?.());

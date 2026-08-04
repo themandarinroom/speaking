@@ -13,9 +13,6 @@ let authorised = false;
 let services = null;
 let selectedId = null;
 let teacherAudioData = "";
-let teacherAudioBlob = null;
-let publishedTeacherAudioUrl = "";
-let removeTeacherAudioOnPublish = false;
 let isPublishing = false;
 const recorder = new LocalRecorder();
 
@@ -62,7 +59,6 @@ function loadDraft() {
   practice = draft?.practice ? normalizePractice(draft.practice) : cloneDefaultPractice();
   title = String(draft?.title || t("defaultPracticeTitle"));
   teacherAudioData = loadRoomTeacherAudio(roomId);
-  teacherAudioBlob = null;
   titleInput.value = title;
 }
 
@@ -142,9 +138,9 @@ document.querySelectorAll("input[name=modelAudio]").forEach(input => input.addEv
 document.getElementById("speechRate").addEventListener("input", event => { practice.settings.speechRate = Number(event.target.value); document.getElementById("speechRateValue").value = Number(event.target.value).toFixed(1); saveDraft(); });
 
 function updateAudioButtons() {
-  const available = Boolean(teacherAudioData || publishedTeacherAudioUrl);
+  const available = Boolean(teacherAudioData);
   playBtn.disabled = !available; removeBtn.disabled = !available; recordBtn.textContent = t(available ? "replace" : "record");
-  if (teacherAudioData) audio.src = teacherAudioData; else if (publishedTeacherAudioUrl) audio.src = publishedTeacherAudioUrl; else audio.removeAttribute("src");
+  if (teacherAudioData) audio.src = teacherAudioData; else audio.removeAttribute("src");
 }
 
 recordBtn.addEventListener("click", async () => {
@@ -153,11 +149,11 @@ recordBtn.addEventListener("click", async () => {
 });
 stopBtn.addEventListener("click", async () => {
   const result = await recorder.stop(); if (!result) return;
-  teacherAudioBlob = result.blob; teacherAudioData = await blobToDataUrl(result.blob); saveRoomTeacherAudio(roomId, teacherAudioData); publishedTeacherAudioUrl = ""; removeTeacherAudioOnPublish = false;
+  teacherAudioData = await blobToDataUrl(result.blob); saveRoomTeacherAudio(roomId, teacherAudioData);
   audioStatus.textContent = t("recordingReady"); recordBtn.disabled = false; stopBtn.disabled = true; updateAudioButtons();
 });
 playBtn.addEventListener("click", async () => { try { audio.currentTime = 0; await audio.play(); } catch { audioStatus.textContent = t("playbackFailed"); } });
-removeBtn.addEventListener("click", () => { clearRoomTeacherAudio(roomId); teacherAudioData = ""; teacherAudioBlob = null; removeTeacherAudioOnPublish = Boolean(publishedTeacherAudioUrl); publishedTeacherAudioUrl = ""; audio.removeAttribute("src"); audioStatus.textContent = t("recordingRemoved"); updateAudioButtons(); });
+removeBtn.addEventListener("click", () => { clearRoomTeacherAudio(roomId); teacherAudioData = ""; audio.removeAttribute("src"); audioStatus.textContent = t("recordingRemoved"); updateAudioButtons(); });
 
 function updateAuthUi() {
   authState.textContent = currentUser ? `${t("signedInAs")}: ${currentUser.email || currentUser.displayName}` : t("signedOut");
@@ -168,13 +164,13 @@ function updateAuthUi() {
 function updatePublishButton() { publishBtn.disabled = !authorised || isPublishing || !isFirebaseConfigured(); }
 
 async function loadPublishedRoom() {
-  loadDraft(); publishedTeacherAudioUrl = ""; lastPublished.textContent = ""; renderAll();
+  loadDraft(); lastPublished.textContent = ""; renderAll();
   if (!authorised || !services) return;
   publishStatus.textContent = t("loadingRoom");
   try {
     const { doc, getDoc } = services.firestoreSdk; const snapshot = await getDoc(doc(services.db, "rooms", roomId));
     if (snapshot.exists()) {
-      const data = snapshot.data(); practice = roomDataToPractice(data); title = String(data.title || t("defaultPracticeTitle")); publishedTeacherAudioUrl = String(data.teacherAudioUrl || ""); teacherAudioData = ""; teacherAudioBlob = null; removeTeacherAudioOnPublish = false;
+      const data = snapshot.data(); practice = roomDataToPractice(data); title = String(data.title || t("defaultPracticeTitle")); teacherAudioData = loadRoomTeacherAudio(roomId);
       if (data.updatedAt?.toDate) lastPublished.textContent = formatText("lastPublished", { time: data.updatedAt.toDate().toLocaleString() });
       publishStatus.textContent = t("roomLoaded"); saveDraft();
     } else publishStatus.textContent = t("roomEmpty");
@@ -194,26 +190,15 @@ async function publishRoom() {
   if (!authorised || !services || isPublishing) return;
   isPublishing = true; updatePublishButton(); publishStatus.textContent = t("publishing");
   try {
-    const { ref, uploadBytesResumable, getDownloadURL, deleteObject } = services.storageSdk;
-    let teacherAudioUrl = publishedTeacherAudioUrl;
-    if (removeTeacherAudioOnPublish) { await deleteObject(ref(services.storage, `teacher-audio/${roomId}/model-audio`)).catch(() => {}); teacherAudioUrl = ""; }
-    if (teacherAudioBlob || teacherAudioData?.startsWith("data:")) {
-      const blob = teacherAudioBlob || await (await fetch(teacherAudioData)).blob();
-      const audioRef = ref(services.storage, `teacher-audio/${roomId}/model-audio`);
-      const task = uploadBytesResumable(audioRef, blob, { contentType: blob.type || "audio/webm" });
-      await new Promise((resolve, reject) => task.on("state_changed", snapshot => { const percent = Math.round(snapshot.bytesTransferred / snapshot.totalBytes * 100); publishStatus.textContent = formatText("uploadProgress", { percent }); }, reject, resolve));
-      teacherAudioUrl = await getDownloadURL(task.snapshot.ref);
-    }
     const { doc, setDoc, serverTimestamp } = services.firestoreSdk;
     await setDoc(doc(services.db, "rooms", roomId), {
       roomId, title: title || t("defaultPracticeTitle"), words: practice.words,
       displaySettings: { showPinyin: practice.settings.showPinyin, showMeanings: practice.settings.showMeanings, enableHover: practice.settings.enableHover, enableTap: practice.settings.enableTap },
       audioSettings: { modelAudio: practice.settings.modelAudio, speechRate: Number(practice.settings.speechRate) || 0.8 },
-      teacherAudioUrl, published: true, updatedAt: serverTimestamp()
+      published: true, updatedAt: serverTimestamp()
     });
-    publishedTeacherAudioUrl = teacherAudioUrl; teacherAudioBlob = null; teacherAudioData = ""; removeTeacherAudioOnPublish = false; clearRoomTeacherAudio(roomId);
     publishStatus.textContent = t("publishSuccess"); lastPublished.textContent = formatText("lastPublished", { time: new Date().toLocaleString() }); updateAudioButtons();
-  } catch (error) { console.error(error); publishStatus.textContent = error.code === "permission-denied" || error.code === "storage/unauthorized" ? t("notAuthorised") : t("publishFailed"); }
+  } catch (error) { console.error(error); publishStatus.textContent = error.code === "permission-denied" ? t("notAuthorised") : t("publishFailed"); }
   finally { isPublishing = false; updatePublishButton(); }
 }
 

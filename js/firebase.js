@@ -14,18 +14,15 @@ export function getFirebaseServices() {
     servicesPromise = Promise.all([
       import(`https://www.gstatic.com/firebasejs/${FIREBASE_VERSION}/firebase-app.js`),
       import(`https://www.gstatic.com/firebasejs/${FIREBASE_VERSION}/firebase-auth.js`),
-      import(`https://www.gstatic.com/firebasejs/${FIREBASE_VERSION}/firebase-firestore.js`),
-      import(`https://www.gstatic.com/firebasejs/${FIREBASE_VERSION}/firebase-storage.js`)
-    ]).then(([appSdk, authSdk, firestoreSdk, storageSdk]) => {
+      import(`https://www.gstatic.com/firebasejs/${FIREBASE_VERSION}/firebase-firestore.js`)
+    ]).then(([appSdk, authSdk, firestoreSdk]) => {
       const app = appSdk.initializeApp(firebaseConfig);
       return {
         app,
         auth: authSdk.getAuth(app),
         db: firestoreSdk.getFirestore(app),
-        storage: storageSdk.getStorage(app),
         authSdk,
-        firestoreSdk,
-        storageSdk
+        firestoreSdk
       };
     });
   }
