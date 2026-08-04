@@ -3,6 +3,8 @@ import { cloneDefaultPractice, normalizePractice } from "./data.js";
 const PRACTICE_KEY = "mandarinSpeaking.practice.v3";
 const LANGUAGE_KEY = "mandarinSpeaking.language";
 const TEACHER_AUDIO_KEY = "mandarinSpeaking.teacherAudio.v3";
+const ROOM_DRAFT_PREFIX = "mandarinSpeaking.roomDraft.v4.";
+const ROOM_AUDIO_PREFIX = "mandarinSpeaking.roomTeacherAudio.v4.";
 
 export function loadPractice() {
   try {
@@ -35,4 +37,29 @@ export function loadTeacherAudio() {
 
 export function clearTeacherAudio() {
   localStorage.removeItem(TEACHER_AUDIO_KEY);
+}
+
+export function loadRoomDraft(roomId) {
+  try {
+    const saved = localStorage.getItem(`${ROOM_DRAFT_PREFIX}${roomId}`);
+    return saved ? JSON.parse(saved) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveRoomDraft(roomId, draft) {
+  localStorage.setItem(`${ROOM_DRAFT_PREFIX}${roomId}`, JSON.stringify(draft));
+}
+
+export function loadRoomTeacherAudio(roomId) {
+  return localStorage.getItem(`${ROOM_AUDIO_PREFIX}${roomId}`) || "";
+}
+
+export function saveRoomTeacherAudio(roomId, dataUrl) {
+  localStorage.setItem(`${ROOM_AUDIO_PREFIX}${roomId}`, dataUrl);
+}
+
+export function clearRoomTeacherAudio(roomId) {
+  localStorage.removeItem(`${ROOM_AUDIO_PREFIX}${roomId}`);
 }

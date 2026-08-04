@@ -12,6 +12,14 @@
     </header>
     <section class="card">
       <p class="eyebrow" data-i18n="teacherMode">Teacher Mode</p><h1 data-i18n="teacherHeading">Build the practice sentence</h1><p data-i18n="teacherIntro">Add one word unit at a time. Pinyin stays lowercase and has no tone marks.</p>
+      <div class="publish-toolbar">
+        <label class="field compact" for="roomSelect"><span data-i18n="classroomRoom">Classroom room</span><select id="roomSelect"></select></label>
+        <label class="field grow" for="practiceTitle"><span data-i18n="practiceTitle">Practice title</span><input id="practiceTitle" type="text" maxlength="80"></label>
+      </div>
+      <div class="auth-panel">
+        <div><strong id="authState" data-i18n="signedOut">Not signed in</strong><p id="authHelp" class="small" data-i18n="signInHelp">Sign in with an authorised teacher Google account to load or publish a room.</p></div>
+        <div class="button-row"><button id="signInBtn" class="button secondary" type="button" data-i18n="signInGoogle">Sign in with Google</button><button id="signOutBtn" class="button quiet" type="button" hidden data-i18n="signOut">Sign out</button></div>
+      </div>
       <h2 data-i18n="words">Word units</h2><div id="wordRows" class="word-editor"></div>
       <button id="addWordBtn" class="button secondary" type="button">＋ <span data-i18n="addWord">Add word</span></button>
     </section>
@@ -36,6 +44,11 @@
       <p id="teacherAudioStatus" class="status" role="status" aria-live="polite"></p><audio id="teacherAudio" hidden></audio>
     </section>
     <section class="card"><h2 data-i18n="preview">Live student preview</h2><div id="teacherPreview"></div><p id="saveStatus" class="status saved" role="status" aria-live="polite"></p></section>
+    <section class="card publish-card">
+      <div><h2 data-i18n="publishHeading">Live classroom publishing</h2><p data-i18n="publishHelp">Publish the current practice and model audio to every iPad in this room.</p><p id="lastPublished" class="small"></p></div>
+      <button id="publishBtn" class="button publish-button" type="button" disabled data-i18n="publishClass">Publish to Class</button>
+      <p id="publishStatus" class="status" role="status" aria-live="polite"></p>
+    </section>
   </main>
   <script type="module" src="js/teacher.js"></script>
 </body></html>
