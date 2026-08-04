@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Student Mode</title><link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <main class="shell student-shell">
+    <header class="topbar page-header"><a class="text-link" href="index.html">← <span data-i18n="backHome">Home</span></a><button class="language-button" data-language-toggle type="button">English / 中文</button></header>
+    <section class="card student-card">
+      <p class="eyebrow" data-i18n="studentMode">Student Mode</p><h1 data-i18n="studentHeading">Listen and have a go!</h1>
+      <div id="voiceChoices" class="voice-choices" hidden><span data-i18n="chooseVoice">Choose a voice</span><button class="chip active" type="button" data-voice="ai" data-i18n="aiChoice">AI Voice</button><button class="chip" type="button" data-voice="teacher" data-i18n="teacherChoice">Teacher Voice</button></div>
+      <div id="sentenceArea"></div>
+      <section id="meaningPanel" class="meaning-panel" aria-live="polite"><p class="meaning-prompt" data-i18n="tapPrompt">Tap a word to see its meaning.</p></section>
+      <div class="button-row student-controls"><button id="listenBtn" class="button" type="button" data-i18n="listen">Listen</button><button id="recordBtn" class="button" type="button" data-i18n="record">Record</button><button id="stopBtn" class="button danger" type="button" disabled data-i18n="stop">Stop</button><button id="playBtn" class="button secondary" type="button" disabled data-i18n="play">Play</button><button id="resetBtn" class="button quiet" type="button" disabled data-i18n="tryAgain">Try Again</button></div>
+      <p id="studentStatus" class="status" role="status" aria-live="polite" data-i18n="ready">Ready</p><audio id="studentAudio" hidden></audio><audio id="modelAudioPlayer" hidden></audio>
+      <p class="privacy" data-i18n="microphoneHelp">The first time you record, tap “Allow” for microphone access. Recordings stay in this browser and are never uploaded.</p>
+    </section>
+  </main>
+  <script type="module" src="js/student.js"></script>
+</body></html>
