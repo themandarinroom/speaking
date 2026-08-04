@@ -21,8 +21,8 @@ Without a `room` parameter, Student Mode asks for one of the approved room codes
 - No student names, accounts, identifiers, results or submissions are collected.
 - Students do not sign in.
 - Student recordings use temporary browser object URLs and never leave the current browser session.
-- Only published room practice data and teacher model audio are downloaded to student devices.
-- There is no student-recording upload code or storage path.
+- Only published room practice data is downloaded to student devices.
+- Teacher and student recordings remain local to the current browser. No recording upload path exists in version 0.4.
 - No service-account keys belong in this repository.
 
 ## Firebase project setup
@@ -48,22 +48,18 @@ Published practices are stored as one document per room:
 rooms/{roomId}
 ```
 
-Each document contains `roomId`, `title`, `words`, `displaySettings`, `audioSettings`, `teacherAudioUrl`, `published`, and the server timestamp `updatedAt`.
+Each document contains `roomId`, `title`, `words`, `displaySettings`, `audioSettings`, `published`, and the server timestamp `updatedAt`.
 
-### 3. Enable Cloud Storage
+Teacher Recording remains in the interface but is stored only in the current browser for version 0.4. If Student Mode opens on another device and Teacher Voice is selected, it explains that the recording is unavailable on that device and automatically uses AI Voice.
 
-1. Open **Build → Storage** and create the default bucket.
-2. Teacher model recordings are stored only at `teacher-audio/{roomId}/model-audio`.
-3. Student recordings are never sent to Cloud Storage.
-
-### 4. Enable Google Authentication
+### 3. Enable Google Authentication
 
 1. Open **Build → Authentication → Sign-in method**.
 2. Enable **Google** and select the project support email.
 3. In **Authentication → Settings → Authorized domains**, add the GitHub Pages host, for example `themandarinroom.github.io`.
 4. Keep student pages unauthenticated. Google sign-in is used only by Teacher Mode.
 
-### 5. Authorise a teacher account
+### 4. Authorise a teacher account
 
 The security rules require both a verified Firebase Authentication account and an explicit allowlist document.
 
@@ -85,7 +81,7 @@ active: true
 
 Do not create this allowlist from client-side code. The included rules deny all client writes to `authorizedTeachers`.
 
-### 6. Deploy security rules
+### 5. Deploy Firestore security rules
 
 Install and authenticate the Firebase CLI, select the correct Firebase project, then deploy both rule files:
 
@@ -93,14 +89,13 @@ Install and authenticate the Firebase CLI, select the correct Firebase project, 
 npm install -g firebase-tools
 firebase login
 firebase use --add
-firebase deploy --only firestore:rules,storage
+firebase deploy --only firestore:rules
 ```
 
 Files:
 
 - `firestore.rules` — public reads only for published fixed-room documents; writes only for active authorised teachers.
-- `storage.rules` — public reads only for teacher model audio in fixed rooms; audio uploads/replacements/deletions only for active authorised teachers, with a 10 MB limit.
-- `firebase.json` — rule deployment configuration.
+- `firebase.json` — Firestore rule deployment configuration.
 
 Test rules in the Firebase Emulator Suite before production changes when possible.
 
@@ -116,11 +111,11 @@ After updating `js/firebase-config.js`, commit that public browser configuration
 2. Sign in with the allowlisted Google account.
 3. Select one pilot room, such as `6B`.
 4. Edit Hanzi, lowercase tone-less Pinyin, meanings and display/audio settings.
-5. Optionally record teacher model audio, then select AI Voice, Teacher Voice or Student choice.
+5. Optionally record local teacher model audio, then select AI Voice, Teacher Voice or Student choice.
 6. Open `student.html?room=6B` on several student iPads. They should show the waiting screen before the first publish.
 7. Click **Publish to Class** on the teacher computer.
-8. Confirm every iPad updates without reloading and receives the latest teacher model audio.
-9. Record and play a student attempt on one iPad. Confirm no student file appears in Firestore or Cloud Storage and that reloading clears the recording.
+8. Confirm every iPad updates without reloading. If Teacher Voice was selected, confirm another device shows “Teacher recording is not yet available on this device.” and plays AI Voice instead.
+9. Record and play a student attempt on one iPad. Confirm no recording appears in Firestore and that reloading clears the recording.
 10. Test an invalid room and Student Mode without a room parameter.
 
 ## File map
@@ -133,15 +128,14 @@ After updating `js/firebase-config.js`, commit that public browser configuration
 - `js/firebase.js` — lazy Firebase modular SDK initialisation
 - `js/rooms.js` — fixed pilot-room validation
 - `js/data.js` — word-level practice schema and lowercase Pinyin cleaning
-- `js/teacher.js` — local editing, teacher audio and publish workflow
+- `js/teacher.js` — local editing, local-only teacher audio and Firestore publish workflow
 - `js/student.js` — realtime room updates and session-local recording
 - `js/recorder.js`, `js/speech.js`, `js/translations.js`, `js/storage.js` — shared features
-- `firestore.rules`, `storage.rules`, `firebase.json` — backend security configuration
+- `firestore.rules`, `firebase.json` — Firestore security configuration
 
 ## Firebase references
 
 - [Add Firebase to a JavaScript project](https://firebase.google.com/docs/web/setup)
 - [Google sign-in for web](https://firebase.google.com/docs/auth/web/google-signin)
 - [Firestore realtime listeners](https://firebase.google.com/docs/firestore/query-data/listen)
-- [Cloud Storage uploads for web](https://firebase.google.com/docs/storage/web/upload-files)
 - [Firestore Security Rules](https://firebase.google.com/docs/firestore/security/get-started)
