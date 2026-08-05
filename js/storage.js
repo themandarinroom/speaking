@@ -5,6 +5,7 @@ const LANGUAGE_KEY = "mandarinSpeaking.language";
 const TEACHER_AUDIO_KEY = "mandarinSpeaking.teacherAudio.v3";
 const ROOM_DRAFT_PREFIX = "mandarinSpeaking.roomDraft.v4.";
 const ROOM_AUDIO_PREFIX = "mandarinSpeaking.roomTeacherAudio.v4.";
+const VOICE_MODE_PREFIX = "mandarinSpeaking.voiceMode.v5.";
 
 export function loadPractice() {
   try {
@@ -62,4 +63,12 @@ export function saveRoomTeacherAudio(roomId, dataUrl) {
 
 export function clearRoomTeacherAudio(roomId) {
   localStorage.removeItem(`${ROOM_AUDIO_PREFIX}${roomId}`);
+}
+
+export function loadVoiceMode(roomId) {
+  return localStorage.getItem(`${VOICE_MODE_PREFIX}${roomId}`) === "teacher" ? "teacher" : "ai";
+}
+
+export function saveVoiceMode(roomId, mode) {
+  localStorage.setItem(`${VOICE_MODE_PREFIX}${roomId}`, mode === "teacher" ? "teacher" : "ai");
 }

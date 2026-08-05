@@ -3,6 +3,7 @@ import { loadRoomDraft, saveRoomDraft, loadRoomTeacherAudio, saveRoomTeacherAudi
 import { LocalRecorder, blobToDataUrl } from "./recorder.js";
 import { PILOT_ROOMS } from "./rooms.js";
 import { getFirebaseServices, isFirebaseConfigured } from "./firebase.js";
+import { uploadTeacherAudio, deleteTeacherAudio, cacheSafeAudioUrl } from "./teacher-audio.js";
 import { initPageTranslations, applyTranslations, formatText, t } from "./translations.js";
 
 let practice = cloneDefaultPractice();
@@ -13,6 +14,9 @@ let authorised = false;
 let services = null;
 let selectedId = null;
 let teacherAudioData = "";
+let teacherAudioBlob = null;
+let publishedTeacherAudio = null;
+let teacherAudioRemoved = false;
 let isPublishing = false;
 const recorder = new LocalRecorder();
 
@@ -59,6 +63,9 @@ function loadDraft() {
   practice = draft?.practice ? normalizePractice(draft.practice) : cloneDefaultPractice();
   title = String(draft?.title || t("defaultPracticeTitle"));
   teacherAudioData = loadRoomTeacherAudio(roomId);
+  teacherAudioBlob = null;
+  publishedTeacherAudio = null;
+  teacherAudioRemoved = false;
   titleInput.value = title;
 }
 
@@ -138,9 +145,11 @@ document.querySelectorAll("input[name=modelAudio]").forEach(input => input.addEv
 document.getElementById("speechRate").addEventListener("input", event => { practice.settings.speechRate = Number(event.target.value); document.getElementById("speechRateValue").value = Number(event.target.value).toFixed(1); saveDraft(); });
 
 function updateAudioButtons() {
-  const available = Boolean(teacherAudioData);
+  const remoteAudio = teacherAudioRemoved ? "" : cacheSafeAudioUrl(publishedTeacherAudio);
+  const source = teacherAudioData || remoteAudio;
+  const available = Boolean(source);
   playBtn.disabled = !available; removeBtn.disabled = !available; recordBtn.textContent = t(available ? "replace" : "record");
-  if (teacherAudioData) audio.src = teacherAudioData; else audio.removeAttribute("src");
+  if (source) audio.src = source; else audio.removeAttribute("src");
 }
 
 recordBtn.addEventListener("click", async () => {
@@ -149,11 +158,11 @@ recordBtn.addEventListener("click", async () => {
 });
 stopBtn.addEventListener("click", async () => {
   const result = await recorder.stop(); if (!result) return;
-  teacherAudioData = await blobToDataUrl(result.blob); saveRoomTeacherAudio(roomId, teacherAudioData);
+  teacherAudioBlob = result.blob; teacherAudioData = await blobToDataUrl(result.blob); teacherAudioRemoved = false; saveRoomTeacherAudio(roomId, teacherAudioData);
   audioStatus.textContent = t("recordingReady"); recordBtn.disabled = false; stopBtn.disabled = true; updateAudioButtons();
 });
 playBtn.addEventListener("click", async () => { try { audio.currentTime = 0; await audio.play(); } catch { audioStatus.textContent = t("playbackFailed"); } });
-removeBtn.addEventListener("click", () => { clearRoomTeacherAudio(roomId); teacherAudioData = ""; audio.removeAttribute("src"); audioStatus.textContent = t("recordingRemoved"); updateAudioButtons(); });
+removeBtn.addEventListener("click", () => { clearRoomTeacherAudio(roomId); teacherAudioData = ""; teacherAudioBlob = null; teacherAudioRemoved = true; audio.removeAttribute("src"); audioStatus.textContent = t("recordingRemoved"); updateAudioButtons(); });
 
 function updateAuthUi() {
   authState.textContent = currentUser ? `${t("signedInAs")}: ${currentUser.email || currentUser.displayName}` : t("signedOut");
@@ -170,7 +179,7 @@ async function loadPublishedRoom() {
   try {
     const { doc, getDoc } = services.firestoreSdk; const snapshot = await getDoc(doc(services.db, "rooms", roomId));
     if (snapshot.exists()) {
-      const data = snapshot.data(); practice = roomDataToPractice(data); title = String(data.title || t("defaultPracticeTitle")); teacherAudioData = loadRoomTeacherAudio(roomId);
+      const data = snapshot.data(); practice = roomDataToPractice(data); title = String(data.title || t("defaultPracticeTitle")); teacherAudioData = loadRoomTeacherAudio(roomId); publishedTeacherAudio = data.teacherAudio || null; teacherAudioRemoved = false;
       if (data.updatedAt?.toDate) lastPublished.textContent = formatText("lastPublished", { time: data.updatedAt.toDate().toLocaleString() });
       publishStatus.textContent = t("roomLoaded"); saveDraft();
     } else publishStatus.textContent = t("roomEmpty");
@@ -191,14 +200,36 @@ async function publishRoom() {
   isPublishing = true; updatePublishButton(); publishStatus.textContent = t("publishing");
   try {
     const { doc, setDoc, serverTimestamp } = services.firestoreSdk;
-    await setDoc(doc(services.db, "rooms", roomId), {
+    let teacherAudio = teacherAudioRemoved ? null : publishedTeacherAudio;
+    let uploadedTeacherAudio = false;
+    if (teacherAudioData) {
+      const blob = teacherAudioBlob || await fetch(teacherAudioData).then(response => response.blob());
+      publishStatus.textContent = formatText("uploadingTeacherVoice", { percent: 0 });
+      teacherAudio = await uploadTeacherAudio(services, roomId, blob, percent => {
+        publishStatus.textContent = formatText("uploadingTeacherVoice", { percent });
+      });
+      uploadedTeacherAudio = true;
+    }
+    const roomDocument = {
       roomId, title: title || t("defaultPracticeTitle"), words: practice.words,
       displaySettings: { showPinyin: practice.settings.showPinyin, showMeanings: practice.settings.showMeanings, enableHover: practice.settings.enableHover, enableTap: practice.settings.enableTap },
       audioSettings: { modelAudio: practice.settings.modelAudio, speechRate: Number(practice.settings.speechRate) || 0.8 },
       published: true, updatedAt: serverTimestamp()
-    });
+    };
+    if (teacherAudio) roomDocument.teacherAudio = teacherAudio;
+    await setDoc(doc(services.db, "rooms", roomId), roomDocument);
+    if (teacherAudioRemoved && publishedTeacherAudio) await deleteTeacherAudio(services, roomId);
+    publishedTeacherAudio = teacherAudio;
+    teacherAudioBlob = null;
+    if (uploadedTeacherAudio) { clearRoomTeacherAudio(roomId); teacherAudioData = ""; }
+    teacherAudioRemoved = false;
     publishStatus.textContent = t("publishSuccess"); lastPublished.textContent = formatText("lastPublished", { time: new Date().toLocaleString() }); updateAudioButtons();
-  } catch (error) { console.error(error); publishStatus.textContent = error.code === "permission-denied" ? t("notAuthorised") : t("publishFailed"); }
+  } catch (error) {
+    console.error(error);
+    if (error.code === "permission-denied" || error.code === "storage/unauthorized" || error.code === "storage/unauthenticated") publishStatus.textContent = t("authExpired");
+    else if (String(error.code || "").startsWith("storage/") || error.message === "upload-timeout") publishStatus.textContent = t("uploadFailed");
+    else publishStatus.textContent = t("publishFailed");
+  }
   finally { isPublishing = false; updatePublishButton(); }
 }
 
