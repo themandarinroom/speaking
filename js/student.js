@@ -3,18 +3,19 @@ import { LocalRecorder } from "./recorder.js";
 import { speakMandarin } from "./speech.js";
 import { getFirebaseServices, isFirebaseConfigured } from "./firebase.js";
 import { isValidRoomId, normalizeRoomId } from "./rooms.js";
-import { loadRoomTeacherAudio } from "./storage.js";
+import { loadRoomTeacherAudio, loadVoiceMode, saveVoiceMode } from "./storage.js";
+import { cacheSafeAudioUrl } from "./teacher-audio.js";
 import { initPageTranslations, applyTranslations, formatText, t } from "./translations.js";
 
+const roomId = normalizeRoomId(new URLSearchParams(location.search).get("room") || "");
 let practice = normalizePractice(null);
-let localTeacherAudio = "";
+let teacherAudioUrl = "";
 let selectedId = null;
-let selectedVoice = "ai";
+let selectedVoice = roomId ? loadVoiceMode(roomId) : "ai";
 let studentAudioUrl = "";
 let receivedPractice = false;
 let unsubscribeRoom = null;
 const recorder = new LocalRecorder();
-const roomId = normalizeRoomId(new URLSearchParams(location.search).get("room") || "");
 
 const roomEntry = document.getElementById("roomEntry");
 const roomCode = document.getElementById("roomCode");
@@ -56,7 +57,7 @@ function showPractice(liveUpdate = false) {
   roomEntry.hidden = true; waitingScreen.hidden = true; practiceContent.hidden = false;
   roomBadge.textContent = formatText("roomLabel", { room: roomId });
   renderSentence(); configureVoiceChoices();
-  if (practice.settings.modelAudio === "teacher" && !localTeacherAudio) status.textContent = t("teacherRecordingUnavailable");
+  if (selectedVoice === "teacher" && !teacherAudioUrl) useAiFallback();
   else if (liveUpdate) status.textContent = t("liveUpdate");
   else if (!studentAudioUrl) status.textContent = t("ready");
 }
@@ -89,25 +90,38 @@ function renderMeaning() {
 document.addEventListener("click", event => { if (!event.target.closest(".word-unit")) updateSelection(null); });
 
 function configureVoiceChoices() {
-  const allowChoice = practice.settings.modelAudio === "choice" && localTeacherAudio;
-  voiceChoices.hidden = !allowChoice;
-  if (practice.settings.modelAudio === "teacher") selectedVoice = "teacher";
-  else if (!allowChoice) selectedVoice = "ai";
+  voiceChoices.hidden = false;
   voiceChoices.querySelectorAll("button[data-voice]").forEach(button => button.classList.toggle("active", button.dataset.voice === selectedVoice));
 }
 
-voiceChoices.addEventListener("click", event => { const button = event.target.closest("button[data-voice]"); if (!button) return; selectedVoice = button.dataset.voice; configureVoiceChoices(); });
+function useAiFallback() {
+  selectedVoice = "ai";
+  if (roomId) saveVoiceMode(roomId, selectedVoice);
+  configureVoiceChoices();
+  status.textContent = t("teacherRecordingUnavailable");
+}
+
+voiceChoices.addEventListener("click", event => {
+  const button = event.target.closest("button[data-voice]"); if (!button) return;
+  selectedVoice = button.dataset.voice;
+  if (selectedVoice === "teacher" && !teacherAudioUrl) { useAiFallback(); return; }
+  if (roomId) saveVoiceMode(roomId, selectedVoice);
+  configureVoiceChoices();
+});
 
 listenBtn.addEventListener("click", async () => {
   try {
-    if (selectedVoice === "teacher" && localTeacherAudio) {
-      modelAudio.src = localTeacherAudio; modelAudio.currentTime = 0; await modelAudio.play(); status.textContent = t("listening");
+    if (selectedVoice === "teacher" && teacherAudioUrl) {
+      modelAudio.src = teacherAudioUrl; modelAudio.currentTime = 0; await modelAudio.play(); status.textContent = t("listening");
     } else if (selectedVoice === "teacher") {
-      speakMandarin(practice.words, practice.settings.speechRate || 0.8); status.textContent = t("teacherRecordingUnavailable");
+      useAiFallback(); speakMandarin(practice.words, practice.settings.speechRate || 0.8);
     } else {
       speakMandarin(practice.words, practice.settings.speechRate || 0.8); status.textContent = t("listening");
     }
-  } catch (error) { status.textContent = t(error.message === "speechUnsupported" ? "speechUnsupported" : "playbackFailed"); }
+  } catch (error) {
+    if (selectedVoice === "teacher") { useAiFallback(); try { speakMandarin(practice.words, practice.settings.speechRate || 0.8); } catch {} }
+    else status.textContent = t(error.message === "speechUnsupported" ? "speechUnsupported" : "playbackFailed");
+  }
 });
 
 recordBtn.addEventListener("click", async () => {
@@ -139,10 +153,17 @@ async function subscribeToRoom() {
     unsubscribeRoom = services.firestoreSdk.onSnapshot(roomRef, snapshot => {
       if (!snapshot.exists() || snapshot.data().published !== true) { receivedPractice = false; showWaiting(); return; }
       const wasLoaded = receivedPractice; const data = snapshot.data();
-      practice = roomDataToPractice(data); localTeacherAudio = loadRoomTeacherAudio(roomId); selectedId = null; receivedPractice = true; showPractice(wasLoaded);
+      practice = roomDataToPractice(data);
+      teacherAudioUrl = cacheSafeAudioUrl(data.teacherAudio) || loadRoomTeacherAudio(roomId);
+      selectedId = null; receivedPractice = true; showPractice(wasLoaded);
     }, error => {
       console.error(error);
-      if (error.code === "permission-denied") showWaiting(); else showWaiting("connectionError");
+      if (receivedPractice) {
+        teacherAudioUrl = "";
+        if (selectedVoice === "teacher") useAiFallback();
+        else status.textContent = t("connectionError");
+      } else if (error.code === "permission-denied") showWaiting();
+      else showWaiting("connectionError");
     });
   } catch (error) { console.error(error); showWaiting("connectionError"); }
 }

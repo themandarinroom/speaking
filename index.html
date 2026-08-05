@@ -9,7 +9,7 @@
 <body>
   <main class="shell landing">
     <div class="topbar">
-      <span class="version">Version 0.4</span>
+      <span class="version" data-app-version></span>
       <button class="language-button" data-language-toggle type="button">English / 中文</button>
     </div>
     <section class="card hero">
@@ -31,6 +31,12 @@
       <p class="privacy" data-i18n="privacyShort">All practice and recordings stay on this device.</p>
     </section>
   </main>
+  <footer class="app-footer">
+    <div>App created by Wei Wang</div>
+    <div>The Mandarin Room © 2026</div>
+    <div data-app-version></div>
+  </footer>
+  <script type="module" src="js/footer.js"></script>
   <script type="module">
     import { initPageTranslations } from "./js/translations.js";
     initPageTranslations();

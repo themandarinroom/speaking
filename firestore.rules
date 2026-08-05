@@ -15,7 +15,7 @@ service cloud.firestore {
     function validRoomDocument(roomId) {
       return request.resource.data.keys().hasOnly([
           'roomId', 'title', 'words', 'displaySettings', 'audioSettings',
-          'published', 'updatedAt'
+          'teacherAudio', 'published', 'updatedAt'
         ])
         && request.resource.data.roomId == roomId
         && request.resource.data.title is string
@@ -25,6 +25,14 @@ service cloud.firestore {
         && request.resource.data.words.size() <= 50
         && request.resource.data.displaySettings is map
         && request.resource.data.audioSettings is map
+        && (!request.resource.data.keys().hasAny(['teacherAudio'])
+          || (request.resource.data.teacherAudio is map
+            && request.resource.data.teacherAudio.keys().hasOnly(['path', 'downloadURL', 'contentType', 'revision'])
+            && request.resource.data.teacherAudio.path == 'teacher-recordings/' + roomId + '/latest'
+            && request.resource.data.teacherAudio.downloadURL is string
+            && request.resource.data.teacherAudio.contentType is string
+            && request.resource.data.teacherAudio.contentType.matches('audio/.*')
+            && request.resource.data.teacherAudio.revision is int))
         && request.resource.data.published == true
         && request.resource.data.updatedAt == request.time;
     }
