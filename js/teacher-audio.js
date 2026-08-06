@@ -1,12 +1,37 @@
 const UPLOAD_TIMEOUT_MS = 60_000;
 
-export const teacherAudioPath = roomId => `teacher-recordings/${roomId}/latest`;
+export const teacherAudioPath = (yearLevelId, practiceId) => `teacher-recordings/${yearLevelId}/${practiceId}/latest`;
 
-export function uploadTeacherAudio(services, roomId, blob, onProgress = () => {}) {
+export async function uploadTeacherAudio(services, yearLevelId, practiceId, blob, onProgress = () => {}) {
+  const authUser = services.auth.currentUser;
+  const path = teacherAudioPath(yearLevelId, practiceId);
+  const contentType = blob.type || "audio/webm";
+
+  if (!authUser) {
+    throw Object.assign(new Error("Firebase Auth is not ready for the teacher audio upload."), { code: "storage/unauthenticated" });
+  }
+  if (services.auth.app !== services.storage.app) {
+    throw Object.assign(new Error("Firebase Auth and Storage are using different app instances."), { code: "storage/app-mismatch" });
+  }
+
+  await authUser.getIdToken(true);
+  if (services.auth.currentUser?.uid !== authUser.uid) {
+    throw Object.assign(new Error("The authenticated teacher changed before the upload started."), { code: "storage/auth-changed" });
+  }
+
+  console.info("[Teacher Voice upload]", {
+    currentUserUid: authUser.uid,
+    currentUserEmail: authUser.email,
+    requestAuthUid: services.auth.currentUser.uid,
+    uploadPath: path,
+    contentType,
+    sameFirebaseApp: true
+  });
+
   const { ref, uploadBytesResumable, getDownloadURL } = services.storageSdk;
-  const audioRef = ref(services.storage, teacherAudioPath(roomId));
+  const audioRef = ref(services.storage, path);
   const task = uploadBytesResumable(audioRef, blob, {
-    contentType: blob.type || "audio/webm",
+    contentType,
     cacheControl: "no-store, max-age=0"
   });
 
@@ -21,15 +46,23 @@ export function uploadTeacherAudio(services, roomId, blob, onProgress = () => {}
       onProgress(percent);
     }, error => {
       window.clearTimeout(timeout);
+      console.error("[Teacher Voice upload failed]", {
+        currentUserUid: services.auth.currentUser?.uid || null,
+        currentUserEmail: services.auth.currentUser?.email || null,
+        requestAuthUid: services.auth.currentUser?.uid || null,
+        uploadPath: path,
+        contentType,
+        errorCode: error.code || null
+      });
       reject(error);
     }, async () => {
       window.clearTimeout(timeout);
       try {
         const downloadURL = await getDownloadURL(task.snapshot.ref);
         resolve({
-          path: teacherAudioPath(roomId),
+          path,
           downloadURL,
-          contentType: blob.type || "audio/webm",
+          contentType,
           revision: Date.now()
         });
       } catch (error) {
@@ -39,10 +72,10 @@ export function uploadTeacherAudio(services, roomId, blob, onProgress = () => {}
   });
 }
 
-export async function deleteTeacherAudio(services, roomId) {
+export async function deleteTeacherAudio(services, yearLevelId, practiceId) {
   const { ref, deleteObject } = services.storageSdk;
   try {
-    await deleteObject(ref(services.storage, teacherAudioPath(roomId)));
+    await deleteObject(ref(services.storage, teacherAudioPath(yearLevelId, practiceId)));
   } catch (error) {
     if (error.code !== "storage/object-not-found") throw error;
   }

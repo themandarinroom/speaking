@@ -11,20 +11,20 @@
       <nav class="header-actions"><a class="button secondary" href="student.html" data-i18n="openStudent">Open Student Mode</a><button class="language-button" data-language-toggle type="button">English / 中文</button></nav>
     </header>
     <section class="card">
-      <p class="eyebrow" data-i18n="teacherMode">Teacher Mode</p><h1 data-i18n="teacherHeading">Build the practice sentence</h1><p data-i18n="teacherIntro">Add one word unit at a time. Pinyin stays lowercase and has no tone marks.</p>
+      <p class="eyebrow" data-i18n="teacherMode">Teacher Mode</p><h1 data-i18n="teacherHeading">Build differentiated speaking practice</h1>
       <div class="publish-toolbar">
-        <label class="field compact" for="roomSelect"><span data-i18n="classroomRoom">Classroom room</span><select id="roomSelect"></select></label>
-        <label class="field grow" for="practiceTitle"><span data-i18n="practiceTitle">Practice title</span><input id="practiceTitle" type="text" maxlength="80"></label>
+        <label class="field compact" for="yearLevelSelect"><span data-i18n="yearLevel">Year level</span><select id="yearLevelSelect"></select></label>
+        <label class="field grow" for="lessonTitle"><span data-i18n="lessonTitle">Lesson Title</span><input id="lessonTitle" type="text" maxlength="80"></label>
       </div>
       <div class="auth-panel">
-        <div><strong id="authState" data-i18n="signedOut">Not signed in</strong><p id="authHelp" class="small" data-i18n="signInHelp">Sign in with an authorised teacher Google account to load or publish a room.</p></div>
+        <div><strong id="authState" data-i18n="signedOut">Not signed in</strong><p id="authHelp" class="small" data-i18n="signInHelp">Sign in with an authorised teacher Google account to load or publish a year level.</p></div>
         <div class="button-row"><button id="signInBtn" class="button secondary" type="button" data-i18n="signInGoogle">Sign in with Google</button><button id="signOutBtn" class="button quiet" type="button" hidden data-i18n="signOut">Sign out</button></div>
       </div>
-      <h2 data-i18n="words">Word units</h2><div id="wordRows" class="word-editor"></div>
-      <button id="addWordBtn" class="button secondary" type="button">＋ <span data-i18n="addWord">Add word</span></button>
+      <p id="saveStatus" class="status saved" role="status" aria-live="polite"></p>
     </section>
+
     <section class="card settings-card">
-      <h2 data-i18n="settings">Student display settings</h2>
+      <h2 data-i18n="settings">Shared display and voice settings</h2>
       <div class="setting-grid">
         <label class="check-row"><input id="showPinyin" type="checkbox"><span data-i18n="showPinyin">Show Pinyin</span></label>
         <label class="check-row"><input id="showMeanings" type="checkbox"><span data-i18n="showMeanings">Show English meanings</span></label>
@@ -38,23 +38,31 @@
       </fieldset>
       <label class="range-row" for="speechRate"><span data-i18n="speechRate">AI speech rate</span><input id="speechRate" type="range" min="0.5" max="1.2" value="0.8" step="0.1"><output id="speechRateValue">0.8</output></label>
     </section>
-    <section class="card">
-      <h2 data-i18n="teacherRecording">Teacher model recording</h2>
-      <div class="button-row"><button id="teacherRecordBtn" class="button" type="button" data-i18n="record">Record</button><button id="teacherStopBtn" class="button danger" type="button" disabled data-i18n="stop">Stop</button><button id="teacherPlayBtn" class="button secondary" type="button" disabled data-i18n="play">Play</button><button id="teacherRemoveBtn" class="button quiet" type="button" disabled data-i18n="remove">Remove</button></div>
-      <p id="teacherAudioStatus" class="status" role="status" aria-live="polite"></p><audio id="teacherAudio" hidden></audio>
+
+    <section class="practice-editor card" data-practice="core">
+      <p class="eyebrow" data-i18n="corePractice">Core Practice</p>
+      <label class="field" for="coreLabel"><span data-i18n="practiceLabel">Practice title</span><input id="coreLabel" type="text" maxlength="60"></label>
+      <h2 data-i18n="words">Word units</h2><div id="coreRows" class="word-editor"></div>
+      <button class="button secondary" type="button" data-add-word="core">＋ <span data-i18n="addWord">Add word</span></button>
+      <div class="practice-audio"><h2 data-i18n="coreTeacherRecording">Core Teacher Voice</h2><div class="button-row"><button class="button" type="button" data-record="core" data-i18n="record">Record</button><button class="button danger" type="button" data-stop="core" disabled data-i18n="stop">Stop</button><button class="button secondary" type="button" data-play="core" disabled data-i18n="play">Play</button><button class="button quiet" type="button" data-remove="core" disabled data-i18n="remove">Remove</button></div><p class="status" data-audio-status="core" role="status" aria-live="polite"></p><audio data-audio="core" hidden></audio></div>
+      <h2 data-i18n="preview">Live student preview</h2><div id="corePreview"></div>
     </section>
-    <section class="card"><h2 data-i18n="preview">Live student preview</h2><div id="teacherPreview"></div><p id="saveStatus" class="status saved" role="status" aria-live="polite"></p></section>
+
+    <section class="practice-editor card" data-practice="challenge">
+      <p class="eyebrow" data-i18n="challengePractice">Challenge Practice</p>
+      <label class="field" for="challengeLabel"><span data-i18n="practiceLabel">Practice title</span><input id="challengeLabel" type="text" maxlength="60"></label>
+      <h2 data-i18n="words">Word units</h2><div id="challengeRows" class="word-editor"></div>
+      <button class="button secondary" type="button" data-add-word="challenge">＋ <span data-i18n="addWord">Add word</span></button>
+      <div class="practice-audio"><h2 data-i18n="challengeTeacherRecording">Challenge Teacher Voice</h2><div class="button-row"><button class="button" type="button" data-record="challenge" data-i18n="record">Record</button><button class="button danger" type="button" data-stop="challenge" disabled data-i18n="stop">Stop</button><button class="button secondary" type="button" data-play="challenge" disabled data-i18n="play">Play</button><button class="button quiet" type="button" data-remove="challenge" disabled data-i18n="remove">Remove</button></div><p class="status" data-audio-status="challenge" role="status" aria-live="polite"></p><audio data-audio="challenge" hidden></audio></div>
+      <h2 data-i18n="preview">Live student preview</h2><div id="challengePreview"></div>
+    </section>
+
     <section class="card publish-card">
-      <div><h2 data-i18n="publishHeading">Live classroom publishing</h2><p data-i18n="publishHelp">Publish the current practice and model audio to every iPad in this room.</p><p id="lastPublished" class="small"></p></div>
-      <button id="publishBtn" class="button publish-button" type="button" disabled data-i18n="publishClass">Publish to Class</button>
+      <div><h2 data-i18n="publishHeading">Year-level publishing</h2><p data-i18n="publishHelp">Publish both practices and Teacher Voice to this year level.</p><p id="lastPublished" class="small"></p></div>
+      <button id="publishBtn" class="button publish-button" type="button" disabled data-i18n="publishYearLevel">Publish to Year Level</button>
       <p id="publishStatus" class="status" role="status" aria-live="polite"></p>
     </section>
   </main>
-  <footer class="app-footer">
-    <div>App created by Wei Wang</div>
-    <div>The Mandarin Room © 2026</div>
-    <div data-app-version></div>
-  </footer>
-  <script type="module" src="js/footer.js"></script>
-  <script type="module" src="js/teacher.js"></script>
+  <footer class="app-footer"><div>App created by Wei Wang</div><div>The Mandarin Room © 2026</div><div data-app-version></div></footer>
+  <script type="module" src="js/footer.js"></script><script type="module" src="js/teacher.js"></script>
 </body></html>

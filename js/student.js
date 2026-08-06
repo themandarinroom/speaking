@@ -2,178 +2,96 @@ import { normalizePractice } from "./data.js";
 import { LocalRecorder } from "./recorder.js";
 import { speakMandarin } from "./speech.js";
 import { getFirebaseServices, isFirebaseConfigured } from "./firebase.js";
-import { isValidRoomId, normalizeRoomId } from "./rooms.js";
-import { loadRoomTeacherAudio, loadVoiceMode, saveVoiceMode } from "./storage.js";
+import { YEAR_LEVELS, PRACTICE_IDS, isValidYearLevelId, normalizeYearLevelId, yearLevelLabel } from "./year-levels.js";
+import { loadYearVoiceMode, saveYearVoiceMode } from "./storage.js";
 import { cacheSafeAudioUrl } from "./teacher-audio.js";
 import { initPageTranslations, applyTranslations, formatText, t } from "./translations.js";
 
-const roomId = normalizeRoomId(new URLSearchParams(location.search).get("room") || "");
-let practice = normalizePractice(null);
-let teacherAudioUrl = "";
-let selectedId = null;
-let selectedVoice = roomId ? loadVoiceMode(roomId) : "ai";
-let studentAudioUrl = "";
-let receivedPractice = false;
-let unsubscribeRoom = null;
-const recorder = new LocalRecorder();
+const yearLevelId = normalizeYearLevelId(new URLSearchParams(location.search).get("year"));
+let lessonTitle = "";
+let settings = normalizePractice(null).settings;
+let receivedContent = false;
+let unsubscribeYearLevel = null;
+const practices = { core: null, challenge: null };
 
-const roomEntry = document.getElementById("roomEntry");
-const roomCode = document.getElementById("roomCode");
-const roomError = document.getElementById("roomError");
+const yearEntry = document.getElementById("yearEntry");
+const yearLevelEntry = document.getElementById("yearLevelEntry");
 const waitingScreen = document.getElementById("waitingScreen");
-const waitingRoom = document.getElementById("waitingRoom");
+const waitingYear = document.getElementById("waitingYear");
 const practiceContent = document.getElementById("practiceContent");
-const roomBadge = document.getElementById("roomBadge");
-const sentenceArea = document.getElementById("sentenceArea");
-const meaningPanel = document.getElementById("meaningPanel");
-const voiceChoices = document.getElementById("voiceChoices");
-const listenBtn = document.getElementById("listenBtn");
-const recordBtn = document.getElementById("recordBtn");
-const stopBtn = document.getElementById("stopBtn");
-const playBtn = document.getElementById("playBtn");
-const resetBtn = document.getElementById("resetBtn");
-const status = document.getElementById("studentStatus");
-const studentAudio = document.getElementById("studentAudio");
-const modelAudio = document.getElementById("modelAudioPlayer");
+const yearBadge = document.getElementById("yearBadge");
+const lessonHeading = document.getElementById("lessonHeading");
 
 function escapeHtml(value) { const span = document.createElement("span"); span.textContent = value; return span.innerHTML; }
+function showYearEntry() { yearEntry.hidden = false; waitingScreen.hidden = true; practiceContent.hidden = true; }
+function showWaiting(messageKey = "waitingTeacher") { yearEntry.hidden = true; waitingScreen.hidden = false; practiceContent.hidden = true; waitingScreen.querySelector("h2").textContent = t(messageKey); waitingYear.textContent = yearLevelId ? yearLevelLabel(yearLevelId) : ""; }
 
-function roomDataToPractice(data) {
-  return normalizePractice({ words: data.words, settings: { ...(data.displaySettings || {}), ...(data.audioSettings || {}) } });
-}
-
-function showRoomEntry(messageKey = "") {
-  roomEntry.hidden = false; waitingScreen.hidden = true; practiceContent.hidden = true;
-  roomError.textContent = messageKey ? t(messageKey) : "";
-}
-
-function showWaiting(messageKey = "waitingTeacher") {
-  roomEntry.hidden = true; waitingScreen.hidden = false; practiceContent.hidden = true;
-  waitingScreen.querySelector("h2").textContent = t(messageKey);
-  waitingRoom.textContent = roomId ? formatText("roomLabel", { room: roomId }) : "";
-}
-
-function showPractice(liveUpdate = false) {
-  roomEntry.hidden = true; waitingScreen.hidden = true; practiceContent.hidden = false;
-  roomBadge.textContent = formatText("roomLabel", { room: roomId });
-  renderSentence(); configureVoiceChoices();
-  if (selectedVoice === "teacher" && !teacherAudioUrl) useAiFallback();
-  else if (liveUpdate) status.textContent = t("liveUpdate");
-  else if (!studentAudioUrl) status.textContent = t("ready");
-}
-
-function renderSentence() {
-  if (!practice.words.length) { sentenceArea.innerHTML = `<p>${escapeHtml(t("noWords"))}</p>`; listenBtn.disabled = true; return; }
-  listenBtn.disabled = false;
-  const sentence = document.createElement("div"); sentence.className = "sentence-units";
-  practice.words.forEach(word => {
-    const unit = document.createElement("button"); unit.type = "button";
-    unit.className = `word-unit ${practice.settings.enableTap ? "interactive" : ""} ${practice.settings.enableHover ? "hover-enabled" : ""} ${selectedId === word.id ? "selected" : ""}`; unit.dataset.id = word.id;
-    unit.innerHTML = `<span class="word-pinyin" ${practice.settings.showPinyin ? "" : "hidden"}>${escapeHtml(word.pinyin)}</span><span class="word-hanzi">${escapeHtml(word.hanzi)}</span>`;
-    if (practice.settings.enableTap) unit.addEventListener("click", event => { event.stopPropagation(); updateSelection(selectedId === word.id ? null : word.id); });
-    if (practice.settings.enableHover) { unit.addEventListener("mouseenter", () => updateSelection(word.id)); unit.addEventListener("mouseleave", () => updateSelection(null)); }
-    sentence.append(unit);
-  });
-  sentenceArea.replaceChildren(sentence); renderMeaning();
-}
-
-function updateSelection(id) {
-  selectedId = id; sentenceArea.querySelectorAll(".word-unit").forEach(unit => unit.classList.toggle("selected", unit.dataset.id === id)); renderMeaning();
-}
-
-function renderMeaning() {
-  meaningPanel.hidden = !practice.settings.showMeanings;
-  const word = practice.words.find(item => item.id === selectedId);
-  meaningPanel.innerHTML = word ? `<div class="meaning-content"><strong>${escapeHtml(word.hanzi)}</strong><span>${escapeHtml(word.pinyin)}</span><span>${escapeHtml(word.meaning)}</span></div>` : `<p class="meaning-prompt">${escapeHtml(t("tapPrompt"))}</p>`;
-}
-
-document.addEventListener("click", event => { if (!event.target.closest(".word-unit")) updateSelection(null); });
-
-function configureVoiceChoices() {
-  voiceChoices.hidden = false;
-  voiceChoices.querySelectorAll("button[data-voice]").forEach(button => button.classList.toggle("active", button.dataset.voice === selectedVoice));
-}
-
-function useAiFallback() {
-  selectedVoice = "ai";
-  if (roomId) saveVoiceMode(roomId, selectedVoice);
-  configureVoiceChoices();
-  status.textContent = t("teacherRecordingUnavailable");
-}
-
-voiceChoices.addEventListener("click", event => {
-  const button = event.target.closest("button[data-voice]"); if (!button) return;
-  selectedVoice = button.dataset.voice;
-  if (selectedVoice === "teacher" && !teacherAudioUrl) { useAiFallback(); return; }
-  if (roomId) saveVoiceMode(roomId, selectedVoice);
-  configureVoiceChoices();
-});
-
-listenBtn.addEventListener("click", async () => {
-  try {
-    if (selectedVoice === "teacher" && teacherAudioUrl) {
-      modelAudio.src = teacherAudioUrl; modelAudio.currentTime = 0; await modelAudio.play(); status.textContent = t("listening");
-    } else if (selectedVoice === "teacher") {
-      useAiFallback(); speakMandarin(practice.words, practice.settings.speechRate || 0.8);
-    } else {
-      speakMandarin(practice.words, practice.settings.speechRate || 0.8); status.textContent = t("listening");
-    }
-  } catch (error) {
-    if (selectedVoice === "teacher") { useAiFallback(); try { speakMandarin(practice.words, practice.settings.speechRate || 0.8); } catch {} }
-    else status.textContent = t(error.message === "speechUnsupported" ? "speechUnsupported" : "playbackFailed");
+class StudentPractice {
+  constructor(id) {
+    this.id = id; this.data = normalizePractice(null); this.label = ""; this.teacherAudioUrl = ""; this.selectedWordId = null;
+    const storedVoice = yearLevelId ? loadYearVoiceMode(yearLevelId, id) : null;
+    this.hasVoicePreference = Boolean(storedVoice); this.selectedVoice = storedVoice || "ai"; this.studentAudioUrl = ""; this.recorder = new LocalRecorder();
+    this.root = document.querySelector(`[data-student-practice="${id}"]`); this.sentence = this.root.querySelector(`[data-sentence="${id}"]`); this.meaning = this.root.querySelector(`[data-meaning="${id}"]`); this.status = this.root.querySelector(`[data-status="${id}"]`); this.studentAudio = this.root.querySelector(`[data-student-audio="${id}"]`); this.modelAudio = this.root.querySelector(`[data-model-audio="${id}"]`);
+    this.bindControls();
   }
-});
 
-recordBtn.addEventListener("click", async () => {
+  bindControls() {
+    this.root.querySelector(".voice-choices").addEventListener("click", event => { const button = event.target.closest("button[data-voice]"); if (!button) return; this.hasVoicePreference = true; this.selectedVoice = button.dataset.voice; if (this.selectedVoice === "teacher" && !this.teacherAudioUrl) this.useAiFallback(); else { saveYearVoiceMode(yearLevelId, this.id, this.selectedVoice); this.renderVoice(); } });
+    this.root.querySelector(`[data-listen="${this.id}"]`).addEventListener("click", () => this.listen());
+    const record = this.root.querySelector(`[data-record="${this.id}"]`); const stop = this.root.querySelector(`[data-stop="${this.id}"]`); const play = this.root.querySelector(`[data-play="${this.id}"]`); const reset = this.root.querySelector(`[data-reset="${this.id}"]`);
+    record.addEventListener("click", async () => { try { if (this.studentAudioUrl) { URL.revokeObjectURL(this.studentAudioUrl); this.studentAudioUrl = ""; } await this.recorder.start(); this.status.textContent = t("studentRecording"); record.disabled = true; stop.disabled = false; play.disabled = true; reset.disabled = true; } catch (error) { this.status.textContent = t(error.name === "NotAllowedError" ? "microphoneDenied" : error.message === "recordingUnsupported" ? "recordingUnsupported" : "recordingFailed"); } });
+    stop.addEventListener("click", async () => { const result = await this.recorder.stop(); if (!result) return; this.studentAudioUrl = result.url; this.studentAudio.src = result.url; this.status.textContent = t("studentRecorded"); record.disabled = false; stop.disabled = true; play.disabled = false; reset.disabled = false; });
+    play.addEventListener("click", async () => { try { this.studentAudio.currentTime = 0; await this.studentAudio.play(); this.status.textContent = t("playing"); } catch { this.status.textContent = t("playbackFailed"); } });
+    reset.addEventListener("click", () => { this.recorder.clear(); this.studentAudioUrl = ""; this.studentAudio.pause(); this.studentAudio.removeAttribute("src"); play.disabled = true; reset.disabled = true; record.disabled = false; stop.disabled = true; this.status.textContent = t("cleared"); });
+  }
+
+  update(value) {
+    this.label = String(value?.label || t(this.id === "core" ? "corePractice" : "challengePractice"));
+    this.data = normalizePractice({ words: value?.words, settings }); this.teacherAudioUrl = cacheSafeAudioUrl(value?.teacherAudio); this.selectedWordId = null;
+    if (!this.hasVoicePreference) this.selectedVoice = settings.modelAudio === "teacher" ? "teacher" : "ai";
+    if (this.selectedVoice === "teacher" && !this.teacherAudioUrl) this.useAiFallback();
+    this.render();
+  }
+
+  render() {
+    this.root.querySelector(`[data-practice-kind="${this.id}"]`).textContent = t(this.id === "core" ? "corePractice" : "challengePractice");
+    this.root.querySelector(`[data-practice-title="${this.id}"]`).textContent = this.label; this.renderSentence(); this.renderVoice();
+    if (!this.studentAudioUrl && !this.status.textContent) this.status.textContent = t("ready");
+  }
+
+  renderSentence() {
+    const wrapper = document.createElement("div"); wrapper.className = "sentence-units";
+    this.data.words.forEach(word => { const unit = document.createElement("button"); unit.type = "button"; unit.dataset.wordId = word.id; unit.className = `word-unit ${settings.enableTap ? "interactive" : ""} ${settings.enableHover ? "hover-enabled" : ""} ${this.selectedWordId === word.id ? "selected" : ""}`; unit.innerHTML = `<span class="word-pinyin" ${settings.showPinyin ? "" : "hidden"}>${escapeHtml(word.pinyin)}</span><span class="word-hanzi">${escapeHtml(word.hanzi)}</span>`; if (settings.enableTap) unit.addEventListener("click", event => { event.stopPropagation(); this.setSelection(this.selectedWordId === word.id ? null : word.id); }); if (settings.enableHover) { unit.addEventListener("mouseenter", () => this.setSelection(word.id)); unit.addEventListener("mouseleave", () => this.setSelection(null)); } wrapper.append(unit); });
+    this.sentence.replaceChildren(wrapper); this.renderMeaning();
+  }
+
+  setSelection(id) { this.selectedWordId = id; this.sentence.querySelectorAll(".word-unit").forEach(unit => unit.classList.toggle("selected", unit.dataset.wordId === id)); this.renderMeaning(); }
+  renderMeaning() { this.meaning.hidden = !settings.showMeanings; const word = this.data.words.find(item => item.id === this.selectedWordId); this.meaning.innerHTML = word ? `<div class="meaning-content"><strong>${escapeHtml(word.hanzi)}</strong><span>${escapeHtml(word.pinyin)}</span><span>${escapeHtml(word.meaning)}</span></div>` : `<p class="meaning-prompt">${escapeHtml(t("tapPrompt"))}</p>`; }
+
+  renderVoice() { this.root.querySelectorAll("button[data-voice]").forEach(button => button.classList.toggle("active", button.dataset.voice === this.selectedVoice)); }
+  useAiFallback() { this.hasVoicePreference = true; this.selectedVoice = "ai"; saveYearVoiceMode(yearLevelId, this.id, "ai"); this.renderVoice(); this.status.textContent = t("teacherRecordingUnavailable"); }
+  async listen() { try { if (this.selectedVoice === "teacher" && this.teacherAudioUrl) { this.modelAudio.src = this.teacherAudioUrl; this.modelAudio.currentTime = 0; await this.modelAudio.play(); this.status.textContent = t("listening"); } else { if (this.selectedVoice === "teacher") this.useAiFallback(); speakMandarin(this.data.words, settings.speechRate || 0.8); if (this.status.textContent !== t("teacherRecordingUnavailable")) this.status.textContent = t("listening"); } } catch (error) { if (this.selectedVoice === "teacher") { this.useAiFallback(); try { speakMandarin(this.data.words, settings.speechRate || 0.8); } catch {} } else this.status.textContent = t(error.message === "speechUnsupported" ? "speechUnsupported" : "playbackFailed"); } }
+}
+
+PRACTICE_IDS.forEach(id => { practices[id] = new StudentPractice(id); });
+document.getElementById("joinYearBtn").addEventListener("click", () => { location.href = `student.html?year=${encodeURIComponent(yearLevelEntry.value)}`; });
+YEAR_LEVELS.forEach(level => { const option = document.createElement("option"); option.value = level.id; option.textContent = level.label; yearLevelEntry.append(option); });
+
+function showPractices(liveUpdate = false) { yearEntry.hidden = true; waitingScreen.hidden = true; practiceContent.hidden = false; yearBadge.textContent = yearLevelLabel(yearLevelId); lessonHeading.textContent = lessonTitle || t("studentHeading"); PRACTICE_IDS.forEach(id => practices[id].render()); if (liveUpdate) PRACTICE_IDS.forEach(id => { if (!practices[id].studentAudioUrl) practices[id].status.textContent = t("liveUpdate"); }); }
+
+async function subscribeToYearLevel() {
+  if (!isValidYearLevelId(yearLevelId)) { showYearEntry(); return; }
+  showWaiting(); if (!isFirebaseConfigured()) { showWaiting("connectionError"); return; }
   try {
-    if (studentAudioUrl) { URL.revokeObjectURL(studentAudioUrl); studentAudioUrl = ""; }
-    await recorder.start(); status.textContent = t("studentRecording"); recordBtn.disabled = true; stopBtn.disabled = false; playBtn.disabled = true; resetBtn.disabled = true;
-  } catch (error) { status.textContent = t(error.name === "NotAllowedError" ? "microphoneDenied" : error.message === "recordingUnsupported" ? "recordingUnsupported" : "recordingFailed"); }
-});
-
-stopBtn.addEventListener("click", async () => { const result = await recorder.stop(); if (!result) return; studentAudioUrl = result.url; studentAudio.src = result.url; status.textContent = t("studentRecorded"); recordBtn.disabled = false; stopBtn.disabled = true; playBtn.disabled = false; resetBtn.disabled = false; });
-playBtn.addEventListener("click", async () => { try { studentAudio.currentTime = 0; await studentAudio.play(); status.textContent = t("playing"); } catch { status.textContent = t("playbackFailed"); } });
-resetBtn.addEventListener("click", () => { recorder.clear(); studentAudioUrl = ""; studentAudio.pause(); studentAudio.removeAttribute("src"); playBtn.disabled = true; resetBtn.disabled = true; recordBtn.disabled = false; stopBtn.disabled = true; status.textContent = t("cleared"); });
-
-document.getElementById("joinRoomBtn").addEventListener("click", () => {
-  const requested = normalizeRoomId(roomCode.value);
-  if (!isValidRoomId(requested)) { roomError.textContent = t("invalidRoom"); return; }
-  location.href = `student.html?room=${encodeURIComponent(requested)}`;
-});
-roomCode.addEventListener("input", () => { roomCode.value = normalizeRoomId(roomCode.value); roomError.textContent = ""; });
-
-async function subscribeToRoom() {
-  if (!roomId) { showRoomEntry(); return; }
-  if (!isValidRoomId(roomId)) { showRoomEntry("invalidRoom"); return; }
-  showWaiting();
-  if (!isFirebaseConfigured()) { showWaiting("connectionError"); return; }
-  try {
-    const services = await getFirebaseServices();
-    const roomRef = services.firestoreSdk.doc(services.db, "rooms", roomId);
-    unsubscribeRoom = services.firestoreSdk.onSnapshot(roomRef, snapshot => {
-      if (!snapshot.exists() || snapshot.data().published !== true) { receivedPractice = false; showWaiting(); return; }
-      const wasLoaded = receivedPractice; const data = snapshot.data();
-      practice = roomDataToPractice(data);
-      teacherAudioUrl = cacheSafeAudioUrl(data.teacherAudio) || loadRoomTeacherAudio(roomId);
-      selectedId = null; receivedPractice = true; showPractice(wasLoaded);
-    }, error => {
-      console.error(error);
-      if (receivedPractice) {
-        teacherAudioUrl = "";
-        if (selectedVoice === "teacher") useAiFallback();
-        else status.textContent = t("connectionError");
-      } else if (error.code === "permission-denied") showWaiting();
-      else showWaiting("connectionError");
-    });
+    const services = await getFirebaseServices(); const ref = services.firestoreSdk.doc(services.db, "yearLevels", yearLevelId);
+    unsubscribeYearLevel = services.firestoreSdk.onSnapshot(ref, snapshot => {
+      if (!snapshot.exists() || snapshot.data().published !== true) { receivedContent = false; showWaiting(); return; }
+      const wasLoaded = receivedContent; const data = snapshot.data(); lessonTitle = String(data.lessonTitle || ""); settings = { ...normalizePractice(null).settings, ...(data.displaySettings || {}), ...(data.audioSettings || {}) };
+      PRACTICE_IDS.forEach(id => practices[id].update(data.practices?.[id])); receivedContent = true; showPractices(wasLoaded);
+    }, error => { console.error(error); if (receivedContent) PRACTICE_IDS.forEach(id => { practices[id].teacherAudioUrl = ""; if (practices[id].selectedVoice === "teacher") practices[id].useAiFallback(); }); else showWaiting("connectionError"); });
   } catch (error) { console.error(error); showWaiting("connectionError"); }
 }
 
-function rerenderLanguage() {
-  applyTranslations();
-  if (!roomId || !isValidRoomId(roomId)) showRoomEntry(roomId ? "invalidRoom" : "");
-  else if (receivedPractice) showPractice(false);
-  else showWaiting();
-}
-
-window.addEventListener("beforeunload", () => unsubscribeRoom?.());
-initPageTranslations(rerenderLanguage); subscribeToRoom();
+function rerenderLanguage() { applyTranslations(); if (!isValidYearLevelId(yearLevelId)) showYearEntry(); else if (receivedContent) showPractices(false); else showWaiting(); }
+window.addEventListener("beforeunload", () => unsubscribeYearLevel?.());
+initPageTranslations(rerenderLanguage); subscribeToYearLevel();
