@@ -8,25 +8,19 @@
   <main class="shell student-shell">
     <header class="topbar page-header"><a class="text-link" href="index.html">← <span data-i18n="backHome">Home</span></a><button class="language-button" data-language-toggle type="button">English / 中文</button></header>
     <section class="card student-card">
-      <p class="eyebrow" data-i18n="studentMode">Student Mode</p><h1 data-i18n="studentHeading">Listen and have a go!</h1>
-      <section id="roomEntry" class="room-entry" hidden><h2 data-i18n="enterRoom">Enter your classroom room</h2><div class="button-row"><label class="field grow" for="roomCode"><span data-i18n="roomCode">Room code</span><input id="roomCode" type="text" maxlength="2" autocomplete="off" autocapitalize="characters"></label><button id="joinRoomBtn" class="button" type="button" data-i18n="joinRoom">Join room</button></div><p id="roomError" class="status error" role="alert"></p></section>
-      <section id="waitingScreen" class="waiting" hidden><div class="waiting-icon" aria-hidden="true">⏳</div><h2 data-i18n="waitingTeacher">Waiting for your teacher to publish a practice.</h2><p id="waitingRoom"></p></section>
+      <p class="eyebrow" data-i18n="studentMode">Student Mode</p><h1 id="lessonHeading" data-i18n="studentHeading">Listen and have a go!</h1>
+      <section id="yearEntry" class="room-entry" hidden><h2 data-i18n="chooseYearLevel">Choose your year level</h2><div class="button-row"><label class="field grow" for="yearLevelEntry"><span data-i18n="yearLevel">Year level</span><select id="yearLevelEntry"></select></label><button id="joinYearBtn" class="button" type="button" data-i18n="joinYearLevel">Open year level</button></div></section>
+      <section id="waitingScreen" class="waiting" hidden><div class="waiting-icon" aria-hidden="true">⏳</div><h2 data-i18n="waitingTeacher">Waiting for your teacher to publish a practice.</h2><p id="waitingYear"></p></section>
       <div id="practiceContent" hidden>
-      <p id="roomBadge" class="room-badge"></p>
-      <div id="voiceChoices" class="voice-choices" hidden><span data-i18n="chooseVoice">Choose a voice</span><button class="chip active" type="button" data-voice="ai" data-i18n="aiChoice">AI Voice</button><button class="chip" type="button" data-voice="teacher" data-i18n="teacherChoice">Teacher Voice</button></div>
-      <div id="sentenceArea"></div>
-      <section id="meaningPanel" class="meaning-panel" aria-live="polite"><p class="meaning-prompt" data-i18n="tapPrompt">Tap a word to see its meaning.</p></section>
-      <div class="button-row student-controls"><button id="listenBtn" class="button" type="button" data-i18n="listen">Listen</button><button id="recordBtn" class="button" type="button" data-i18n="record">Record</button><button id="stopBtn" class="button danger" type="button" disabled data-i18n="stop">Stop</button><button id="playBtn" class="button secondary" type="button" disabled data-i18n="play">Play</button><button id="resetBtn" class="button quiet" type="button" disabled data-i18n="tryAgain">Try Again</button></div>
-      <p id="studentStatus" class="status" role="status" aria-live="polite" data-i18n="ready">Ready</p><audio id="studentAudio" hidden></audio><audio id="modelAudioPlayer" hidden></audio>
-      <p class="privacy" data-i18n="microphoneHelp">The first time you record, tap “Allow” for microphone access. Recordings stay in this browser and are never uploaded.</p>
+        <p id="yearBadge" class="room-badge"></p>
+        <div id="studentPractices" class="student-practice-grid">
+          <section class="practice-card" data-student-practice="core"><p class="eyebrow" data-practice-kind="core"></p><h2 data-practice-title="core"></h2><div class="voice-choices"><span data-i18n="chooseVoice">Choose a voice</span><button class="chip active" type="button" data-voice="ai">🔊 <span data-i18n="aiChoice">AI Voice</span></button><button class="chip" type="button" data-voice="teacher">👩‍🏫 <span data-i18n="teacherChoice">Teacher Voice</span></button></div><div data-sentence="core"></div><section class="meaning-panel" data-meaning="core" aria-live="polite"></section><div class="button-row student-controls"><button class="button" type="button" data-listen="core" data-i18n="listen">Listen</button><button class="button" type="button" data-record="core" data-i18n="record">Record</button><button class="button danger" type="button" data-stop="core" disabled data-i18n="stop">Stop</button><button class="button secondary" type="button" data-play="core" disabled data-i18n="play">Play</button><button class="button quiet" type="button" data-reset="core" disabled data-i18n="tryAgain">Try Again</button></div><p class="status" data-status="core" role="status" aria-live="polite"></p><audio data-student-audio="core" hidden></audio><audio data-model-audio="core" hidden></audio></section>
+          <section class="practice-card" data-student-practice="challenge"><p class="eyebrow" data-practice-kind="challenge"></p><h2 data-practice-title="challenge"></h2><div class="voice-choices"><span data-i18n="chooseVoice">Choose a voice</span><button class="chip active" type="button" data-voice="ai">🔊 <span data-i18n="aiChoice">AI Voice</span></button><button class="chip" type="button" data-voice="teacher">👩‍🏫 <span data-i18n="teacherChoice">Teacher Voice</span></button></div><div data-sentence="challenge"></div><section class="meaning-panel" data-meaning="challenge" aria-live="polite"></section><div class="button-row student-controls"><button class="button" type="button" data-listen="challenge" data-i18n="listen">Listen</button><button class="button" type="button" data-record="challenge" data-i18n="record">Record</button><button class="button danger" type="button" data-stop="challenge" disabled data-i18n="stop">Stop</button><button class="button secondary" type="button" data-play="challenge" disabled data-i18n="play">Play</button><button class="button quiet" type="button" data-reset="challenge" disabled data-i18n="tryAgain">Try Again</button></div><p class="status" data-status="challenge" role="status" aria-live="polite"></p><audio data-student-audio="challenge" hidden></audio><audio data-model-audio="challenge" hidden></audio></section>
+        </div>
+        <p class="privacy" data-i18n="microphoneHelp">The first time you record, tap “Allow” for microphone access. Recordings stay in this browser and are never uploaded.</p>
       </div>
     </section>
   </main>
-  <footer class="app-footer">
-    <div>App created by Wei Wang</div>
-    <div>The Mandarin Room © 2026</div>
-    <div data-app-version></div>
-  </footer>
-  <script type="module" src="js/footer.js"></script>
-  <script type="module" src="js/student.js"></script>
+  <footer class="app-footer"><div>App created by Wei Wang</div><div>The Mandarin Room © 2026</div><div data-app-version></div></footer>
+  <script type="module" src="js/footer.js"></script><script type="module" src="js/student.js"></script>
 </body></html>

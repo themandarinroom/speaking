@@ -16,8 +16,26 @@ export const DEFAULT_PRACTICE = {
   }
 };
 
+export const DEFAULT_CHALLENGE_PRACTICE = {
+  version: 3,
+  words: [
+    { id: "challenge-word-1", hanzi: "我", pinyin: "wo", meaning: "I / me" },
+    { id: "challenge-word-2", hanzi: "会", pinyin: "hui", meaning: "can" },
+    { id: "challenge-word-3", hanzi: "说", pinyin: "shuo", meaning: "speak" },
+    { id: "challenge-word-4", hanzi: "中文", pinyin: "zhong wen", meaning: "Chinese" }
+  ],
+  settings: { ...DEFAULT_PRACTICE.settings }
+};
+
 export function cloneDefaultPractice() {
   return JSON.parse(JSON.stringify(DEFAULT_PRACTICE));
+}
+
+export function cloneDefaultPractices() {
+  return {
+    core: { label: "Core Practice", ...cloneDefaultPractice() },
+    challenge: { label: "Challenge Practice", ...JSON.parse(JSON.stringify(DEFAULT_CHALLENGE_PRACTICE)) }
+  };
 }
 
 export function cleanPinyin(value = "") {
