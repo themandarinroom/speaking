@@ -1,5 +1,26 @@
 # Changelog
 
+## Version 0.6.0 — August 2026
+
+### Added
+
+- Optional Interactive Vocabulary sets for Core and Challenge Practice
+- Stable-ID sentence substitution with up to 20 teacher-authored choices
+- Touch-friendly student vocabulary cards with image, emoji, or text fallbacks
+- Per-item AI pronunciation and a one-tap Restore Example action
+- Teacher preview for vocabulary substitutions before publishing
+
+### Changed
+
+- AI Voice reads the student’s current personalised sentence
+- Teacher Voice remains the original recorded teacher model
+- Changing a vocabulary choice clears only that practice’s local student recording
+
+### Privacy
+
+- Student vocabulary choices and recordings remain local to the browser
+- Vocabulary images are referenced by URL; the app adds no image upload or new Storage path
+
 ## Version 0.5.1 — August 2026
 
 ### Added

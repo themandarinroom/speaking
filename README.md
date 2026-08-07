@@ -1,4 +1,4 @@
-# Mandarin Speaking Practice — Version 0.5.1
+# Mandarin Speaking Practice — Version 0.6.0
 
 A bilingual, iPad-friendly classroom tool for differentiated primary-school Mandarin speaking practice. Teachers publish one current lesson per Australian primary year level. Every lesson contains Core Practice followed by Challenge Practice, and student devices update through a Firestore realtime listener.
 
@@ -23,7 +23,7 @@ Each year level has one Lesson Title, shared display/audio settings, and exactly
 1. Core Practice
 2. Challenge Practice
 
-Both activities retain the word-level `id`, `hanzi`, `pinyin`, and `meaning` model. They have separate Teacher Voice files and separate session-local student recorders.
+Both activities retain the word-level `id`, `hanzi`, `pinyin`, and `meaning` model. They have separate Teacher Voice files and separate session-local student recorders. A teacher may optionally select one sentence word and publish up to 20 Interactive Vocabulary choices for that position.
 
 The current published document is:
 
@@ -39,8 +39,8 @@ Its shape is:
   yearLevelLabel,
   lessonTitle,
   practices: {
-    core: { label, words, teacherAudio? },
-    challenge: { label, words, teacherAudio? }
+    core: { label, words, teacherAudio?, substitution? },
+    challenge: { label, words, teacherAudio?, substitution? }
   },
   displaySettings: { showPinyin, showMeanings, enableHover, enableTap },
   audioSettings: { modelAudio, speechRate },
@@ -49,7 +49,16 @@ Its shape is:
 }
 ```
 
-Older `rooms/{roomId}` documents may remain but Version 0.5.1 does not read them.
+An optional `substitution` contains `{ enabled: true, targetWordId, vocabulary }`. Each vocabulary item has a stable `id`, `hanzi`, lowercase toneless `pinyin`, `meaning`, and optional `imageUrl` and `emoji`. Older documents without this field remain fully compatible.
+
+## Interactive Vocabulary behaviour
+
+- A vocabulary choice replaces exactly one word, matched by stable word ID; the published example is never mutated.
+- Students can restore the example at any time. Choices are not written to Firestore or browser storage.
+- Vocabulary Listen buttons always use device AI speech for the individual word.
+- AI Voice reads the current personalised sentence. Teacher Voice plays the original recorded model and the interface explains this when a choice is active.
+- Changing or restoring a choice clears that practice's temporary student recording so recordings cannot be mistaken for a different sentence.
+- Images are remote URL references only. Version 0.6.0 adds no image upload and no Cloud Storage path.
 
 ## Teacher Voice storage
 
@@ -93,14 +102,17 @@ firebase deploy --only firestore:rules,storage
 1. Sign in to Teacher Mode with an active allowlisted Google account.
 2. Select a year level and enter its Lesson Title.
 3. Edit Core and Challenge independently and configure the shared settings.
-4. Record distinct Core and Challenge Teacher Voice audio.
-5. Publish once and confirm the corresponding `yearLevels/{yearLevelId}` document contains both activities.
-6. Confirm Storage contains only `core/latest` and `challenge/latest` for that year level.
-7. Open the matching student URL on a laptop, iPad, and iPhone; confirm both cards update without reload.
-8. Replace Core audio and confirm Challenge is unchanged, then replace Challenge and confirm Core is unchanged.
-9. Test AI and Teacher Voice, including independent fallback in both cards.
-10. Record Core and Challenge student attempts independently, reload, and confirm both disappear and no student audio reaches Firebase.
-11. Verify unauthorised users cannot publish or upload.
+4. Optionally enable Interactive Vocabulary, choose one replaceable word, add/reorder choices, and verify the preview.
+5. Record distinct Core and Challenge Teacher Voice audio.
+6. Publish once and confirm the corresponding `yearLevels/{yearLevelId}` document contains both activities and optional substitution data.
+7. Confirm Storage contains only `core/latest` and `challenge/latest` for that year level.
+8. Open the matching student URL on a laptop, iPad, and iPhone; confirm both cards and vocabulary update without reload.
+9. Select, switch, and restore vocabulary; verify only the chosen word changes and prior local recordings clear.
+10. Verify vocabulary Listen and personalised AI Voice, then confirm Teacher Voice still plays the original model.
+11. Replace Core audio and confirm Challenge is unchanged, then replace Challenge and confirm Core is unchanged.
+12. Test AI and Teacher Voice, including independent fallback in both cards.
+13. Record Core and Challenge student attempts independently, reload, and confirm both disappear and no student audio reaches Firebase.
+14. Verify unauthorised users cannot publish or upload.
 
 ## File map
 

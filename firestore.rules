@@ -24,12 +24,21 @@ service cloud.firestore {
 
     function validPractice(practice, yearLevelId, practiceId) {
       return practice is map
-        && practice.keys().hasOnly(['label', 'words', 'teacherAudio'])
+        && practice.keys().hasOnly(['label', 'words', 'teacherAudio', 'substitution'])
         && practice.label is string
         && practice.label.size() <= 60
         && practice.words is list
         && practice.words.size() > 0
         && practice.words.size() <= 50
+        && (!practice.keys().hasAny(['substitution'])
+          || (practice.substitution is map
+            && practice.substitution.keys().hasOnly(['enabled', 'targetWordId', 'vocabulary'])
+            && practice.substitution.enabled == true
+            && practice.substitution.targetWordId is string
+            && practice.substitution.targetWordId.size() > 0
+            && practice.substitution.vocabulary is list
+            && practice.substitution.vocabulary.size() > 0
+            && practice.substitution.vocabulary.size() <= 20))
         && (!practice.keys().hasAny(['teacherAudio'])
           || validTeacherAudio(practice.teacherAudio, 'teacher-recordings/' + yearLevelId + '/' + practiceId + '/latest'));
     }
