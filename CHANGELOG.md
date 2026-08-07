@@ -1,5 +1,14 @@
 # Changelog
 
+## Version 0.6.1 — August 2026
+
+### Changed
+
+- Student controls now appear immediately above the Mandarin sentence
+- Student sentences use continuous Hanzi with aligned word-level Pinyin and Chinese punctuation
+- English meanings now appear in temporary popovers instead of a permanent panel
+- Key Vocabulary now uses a compact responsive list with accessible speaker controls
+
 ## Version 0.6.0 — August 2026
 
 ### Added
@@ -15,10 +24,6 @@
 - AI Voice reads the student’s current personalised sentence
 - Teacher Voice remains the original recorded teacher model
 - Changing a vocabulary choice clears only that practice’s local student recording
-- Student controls now appear immediately above the Mandarin sentence
-- Student sentences use continuous Hanzi with aligned word-level Pinyin and Chinese punctuation
-- English meanings now appear in temporary popovers instead of a permanent panel
-- Key Vocabulary now uses a compact responsive list with accessible speaker controls
 
 ### Privacy
 
