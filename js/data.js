@@ -43,7 +43,7 @@ export function cleanPinyin(value = "") {
 }
 
 export function normalizeSubstitution(value, words) {
-  const wordIds = new Set(words.map(word => word.id));
+  const wordIds = new Set(words.filter(word => splitWordPunctuation(word.hanzi).text).map(word => word.id));
   const targetWordId = wordIds.has(String(value?.targetWordId || "")) ? String(value.targetWordId) : "";
   const seen = new Set();
   const vocabulary = (Array.isArray(value?.vocabulary) ? value.vocabulary : []).slice(0, 20).map((item, index) => {
@@ -82,12 +82,29 @@ export function substitutePracticeWords(words, substitution, selectedVocabularyI
   });
 }
 
-const CHINESE_PUNCTUATION = /[。，？！：]+$/u;
+const TRAILING_PUNCTUATION = /[。，？！：.!?,:]+$/u;
+const SENTENCE_ENDING_PUNCTUATION = /[。？！.!?]$/u;
+const FULL_WIDTH_PUNCTUATION = { ".": "。", "?": "？", "!": "！", ",": "，", ":": "：" };
+
+function normalizePunctuation(value = "") {
+  return [...String(value)].map(mark => FULL_WIDTH_PUNCTUATION[mark] || mark).join("");
+}
 
 export function splitWordPunctuation(hanzi = "") {
   const value = String(hanzi);
-  const match = value.match(CHINESE_PUNCTUATION);
-  return { text: match ? value.slice(0, -match[0].length) : value, punctuation: match?.[0] || "" };
+  const match = value.match(TRAILING_PUNCTUATION);
+  return { text: match ? value.slice(0, -match[0].length) : value, punctuation: normalizePunctuation(match?.[0] || "") };
+}
+
+export function practiceTitlePunctuation(title = "") {
+  const trimmed = String(title).trim();
+  if (/[?？]$/u.test(trimmed)) return "？";
+  if (/[!！]$/u.test(trimmed)) return "！";
+  return "。";
+}
+
+export function hasSentenceEndingPunctuation(value = "") {
+  return SENTENCE_ENDING_PUNCTUATION.test(String(value).trim());
 }
 
 export function normalizePractice(value) {
@@ -106,7 +123,9 @@ export function normalizePractice(value) {
   };
 }
 
-export function sentenceText(words) {
-  const sentence = words.map(word => word.hanzi).join("");
-  return CHINESE_PUNCTUATION.test(sentence) ? sentence : `${sentence}。`;
+export function sentenceText(words, fallbackPunctuation = "。") {
+  const rawSentence = words.map(word => word.hanzi).join("");
+  const { text, punctuation } = splitWordPunctuation(rawSentence);
+  const sentence = `${text}${punctuation}`;
+  return hasSentenceEndingPunctuation(sentence) || !fallbackPunctuation ? sentence : `${sentence}${normalizePunctuation(fallbackPunctuation)}`;
 }

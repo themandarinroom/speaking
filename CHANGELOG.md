@@ -1,5 +1,13 @@
 # Changelog
 
+## Version 0.6.2 — August 2026
+
+### Fixed
+
+- Automatic sentence-ending punctuation now follows the Practice Title: questions use `？`, exclamations use `！`, and other titles use `。`
+- Teacher-authored sentence punctuation remains authoritative and survives Interactive Vocabulary substitution
+- AI Voice uses the same complete, full-width-punctuation sentence shown to students
+
 ## Version 0.6.1 — August 2026
 
 ### Changed
