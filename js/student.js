@@ -1,4 +1,4 @@
-import { normalizePractice, normalizeDifferentiatedPractice, splitWordPunctuation, substitutePracticeWords } from "./data.js";
+import { hasSentenceEndingPunctuation, normalizePractice, normalizeDifferentiatedPractice, practiceTitlePunctuation, splitWordPunctuation, substitutePracticeWords } from "./data.js";
 import { LocalRecorder } from "./recorder.js";
 import { speakMandarin } from "./speech.js";
 import { getFirebaseServices, isFirebaseConfigured } from "./firebase.js";
@@ -36,6 +36,7 @@ class StudentPractice {
   }
 
   currentWords() { return substitutePracticeWords(this.data.words, this.data.substitution, this.selectedVocabularyId); }
+  fallbackPunctuation() { return practiceTitlePunctuation(this.label); }
 
   clearStudentRecording(messageKey = "") {
     this.recorder.clear();
@@ -80,9 +81,9 @@ class StudentPractice {
 
   renderSentence() {
     const wrapper = document.createElement("div"); wrapper.className = "sentence-units";
-    const words = this.currentWords(); let hasFinalPunctuation = false;
-    words.forEach((word, index) => {
-      const { text, punctuation } = splitWordPunctuation(word.hanzi); hasFinalPunctuation = index === words.length - 1 && Boolean(punctuation);
+    const words = this.currentWords(); const hasExplicitEnding = hasSentenceEndingPunctuation(words.map(word => word.hanzi).join(""));
+    words.forEach(word => {
+      const { text, punctuation } = splitWordPunctuation(word.hanzi);
       if (text) {
         const unit = document.createElement("button"); unit.type = "button"; unit.dataset.wordId = word.id; unit.className = `word-unit ${settings.enableTap ? "interactive" : ""} ${this.selectedWordId === word.id ? "selected" : ""}`;
         const pinyin = document.createElement("span"); pinyin.className = "word-pinyin"; pinyin.textContent = word.pinyin;
@@ -92,7 +93,7 @@ class StudentPractice {
       }
       if (punctuation) { const mark = document.createElement("span"); mark.className = "sentence-punctuation"; mark.textContent = punctuation; wrapper.append(mark); }
     });
-    if (!hasFinalPunctuation) { const mark = document.createElement("span"); mark.className = "sentence-punctuation"; mark.textContent = "。"; wrapper.append(mark); }
+    if (!hasExplicitEnding) { const mark = document.createElement("span"); mark.className = "sentence-punctuation"; mark.textContent = this.fallbackPunctuation(); wrapper.append(mark); }
     this.sentence.replaceChildren(wrapper);
   }
 
@@ -125,7 +126,7 @@ class StudentPractice {
       const choose = document.createElement("button"); choose.type = "button"; choose.className = "vocabulary-choice"; choose.setAttribute("aria-pressed", String(item.id === this.selectedVocabularyId));
       const text = document.createElement("span"); text.className = "vocabulary-text"; const hanzi = document.createElement("strong"); hanzi.textContent = splitWordPunctuation(item.hanzi).text; const pinyin = document.createElement("span"); pinyin.textContent = item.pinyin; text.append(hanzi, pinyin); choose.append(text);
       choose.addEventListener("click", event => { this.chooseVocabulary(item.id); this.showMeaning(item.meaning, choose, event); });
-      const listen = document.createElement("button"); listen.type = "button"; listen.className = "vocabulary-listen"; listen.textContent = "🔊"; listen.setAttribute("aria-label", `${t("vocabularyListen")}: ${item.hanzi}`); listen.addEventListener("click", () => { try { speakMandarin([{ hanzi: item.hanzi }], settings.speechRate || 0.8); } catch { this.status.textContent = t("speechUnsupported"); } });
+      const listen = document.createElement("button"); listen.type = "button"; listen.className = "vocabulary-listen"; listen.textContent = "🔊"; listen.setAttribute("aria-label", `${t("vocabularyListen")}: ${item.hanzi}`); listen.addEventListener("click", () => { try { speakMandarin([{ hanzi: item.hanzi }], settings.speechRate || 0.8, ""); } catch { this.status.textContent = t("speechUnsupported"); } });
       row.append(choose, listen); grid.append(row);
     });
     this.root.querySelector(`[data-restore-example="${this.id}"]`).disabled = !this.selectedVocabularyId;
@@ -134,7 +135,7 @@ class StudentPractice {
 
   renderVoice() { this.root.querySelectorAll("button[data-voice]").forEach(button => button.classList.toggle("active", button.dataset.voice === this.selectedVoice)); const note = this.root.querySelector(`[data-teacher-model-note="${this.id}"]`); if (note) note.hidden = !(this.selectedVocabularyId && this.selectedVoice === "teacher"); }
   useAiFallback() { this.hasVoicePreference = true; this.selectedVoice = "ai"; saveYearVoiceMode(yearLevelId, this.id, "ai"); this.renderVoice(); this.status.textContent = t("teacherRecordingUnavailable"); }
-  async listen() { try { if (this.selectedVoice === "teacher" && this.teacherAudioUrl) { this.modelAudio.src = this.teacherAudioUrl; this.modelAudio.currentTime = 0; await this.modelAudio.play(); this.status.textContent = t("listening"); } else { if (this.selectedVoice === "teacher") this.useAiFallback(); speakMandarin(this.currentWords(), settings.speechRate || 0.8); if (this.status.textContent !== t("teacherRecordingUnavailable")) this.status.textContent = t("listening"); } } catch (error) { if (this.selectedVoice === "teacher") { this.useAiFallback(); try { speakMandarin(this.currentWords(), settings.speechRate || 0.8); } catch {} } else this.status.textContent = t(error.message === "speechUnsupported" ? "speechUnsupported" : "playbackFailed"); } }
+  async listen() { try { if (this.selectedVoice === "teacher" && this.teacherAudioUrl) { this.modelAudio.src = this.teacherAudioUrl; this.modelAudio.currentTime = 0; await this.modelAudio.play(); this.status.textContent = t("listening"); } else { if (this.selectedVoice === "teacher") this.useAiFallback(); speakMandarin(this.currentWords(), settings.speechRate || 0.8, this.fallbackPunctuation()); if (this.status.textContent !== t("teacherRecordingUnavailable")) this.status.textContent = t("listening"); } } catch (error) { if (this.selectedVoice === "teacher") { this.useAiFallback(); try { speakMandarin(this.currentWords(), settings.speechRate || 0.8, this.fallbackPunctuation()); } catch {} } else this.status.textContent = t(error.message === "speechUnsupported" ? "speechUnsupported" : "playbackFailed"); } }
 }
 
 PRACTICE_IDS.forEach(id => { practices[id] = new StudentPractice(id); });

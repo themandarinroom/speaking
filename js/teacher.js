@@ -1,4 +1,4 @@
-import { cleanPinyin, cloneDefaultPractice, cloneDefaultPractices, normalizeDifferentiatedPractice, substitutePracticeWords } from "./data.js";
+import { cleanPinyin, cloneDefaultPractice, cloneDefaultPractices, normalizeDifferentiatedPractice, splitWordPunctuation, substitutePracticeWords } from "./data.js";
 import { loadYearDraft, saveYearDraft, loadYearTeacherAudio, saveYearTeacherAudio, clearYearTeacherAudio } from "./storage.js";
 import { LocalRecorder, blobToDataUrl } from "./recorder.js";
 import { YEAR_LEVELS, PRACTICE_IDS, yearLevelLabel } from "./year-levels.js";
@@ -110,7 +110,7 @@ function renderVocabulary(practiceId) {
   document.querySelector(`[data-vocabulary-enabled="${practiceId}"]`).checked = enabled;
   const target = document.querySelector(`[data-target-word="${practiceId}"]`); target.replaceChildren();
   const placeholder = document.createElement("option"); placeholder.value = ""; placeholder.textContent = t("chooseReplaceableWord"); target.append(placeholder);
-  practices[practiceId].words.forEach(word => { const option = document.createElement("option"); option.value = word.id; option.textContent = `${word.hanzi} — ${word.pinyin}`; target.append(option); });
+  practices[practiceId].words.filter(word => splitWordPunctuation(word.hanzi).text).forEach(word => { const option = document.createElement("option"); option.value = word.id; option.textContent = `${word.hanzi} — ${word.pinyin}`; target.append(option); });
   target.value = substitution.targetWordId; target.disabled = !enabled;
   const rows = document.querySelector(`[data-vocabulary-rows="${practiceId}"]`); rows.replaceChildren();
   substitution.vocabulary.forEach((item, index) => {
