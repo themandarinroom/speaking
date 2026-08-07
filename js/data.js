@@ -42,6 +42,42 @@ export function cleanPinyin(value = "") {
   return value.toLowerCase().replace(/[^a-z\s'-]/g, "").replace(/\s+/g, " ").trim();
 }
 
+export function normalizeSubstitution(value, words) {
+  const wordIds = new Set(words.map(word => word.id));
+  const targetWordId = wordIds.has(String(value?.targetWordId || "")) ? String(value.targetWordId) : "";
+  const seen = new Set();
+  const vocabulary = (Array.isArray(value?.vocabulary) ? value.vocabulary : []).slice(0, 20).map((item, index) => {
+    let id = String(item?.id || `vocabulary-${Date.now()}-${index}`).trim();
+    if (seen.has(id)) id = `${id}-${index}`;
+    seen.add(id);
+    return {
+      id,
+      hanzi: String(item?.hanzi || "").trim(),
+      pinyin: cleanPinyin(String(item?.pinyin || "")),
+      meaning: String(item?.meaning || "").trim(),
+      imageUrl: String(item?.imageUrl || "").trim(),
+      emoji: String(item?.emoji || "").trim()
+    };
+  }).filter(item => item.hanzi || item.pinyin || item.meaning);
+  return { enabled: Boolean(value?.enabled) && Boolean(targetWordId), targetWordId, vocabulary };
+}
+
+export function normalizeDifferentiatedPractice(value, fallbackLabel) {
+  const practice = normalizePractice({ words: value?.words });
+  return {
+    label: String(value?.label || fallbackLabel),
+    version: practice.version,
+    words: practice.words,
+    substitution: normalizeSubstitution(value?.substitution, practice.words)
+  };
+}
+
+export function substitutePracticeWords(words, substitution, selectedVocabularyId) {
+  const selected = substitution?.vocabulary?.find(item => item.id === selectedVocabularyId);
+  if (!substitution?.enabled || !selected) return words.map(word => ({ ...word }));
+  return words.map(word => word.id === substitution.targetWordId ? { ...word, hanzi: selected.hanzi, pinyin: selected.pinyin, meaning: selected.meaning } : { ...word });
+}
+
 export function normalizePractice(value) {
   const fallback = cloneDefaultPractice();
   if (!value || !Array.isArray(value.words)) return fallback;
