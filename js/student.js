@@ -1,4 +1,4 @@
-import { normalizePractice, normalizeDifferentiatedPractice, substitutePracticeWords } from "./data.js";
+import { normalizePractice, normalizeDifferentiatedPractice, splitWordPunctuation, substitutePracticeWords } from "./data.js";
 import { LocalRecorder } from "./recorder.js";
 import { speakMandarin } from "./speech.js";
 import { getFirebaseServices, isFirebaseConfigured } from "./firebase.js";
@@ -22,16 +22,16 @@ const practiceContent = document.getElementById("practiceContent");
 const yearBadge = document.getElementById("yearBadge");
 const lessonHeading = document.getElementById("lessonHeading");
 
-function escapeHtml(value) { const span = document.createElement("span"); span.textContent = value; return span.innerHTML; }
 function showYearEntry() { yearEntry.hidden = false; waitingScreen.hidden = true; practiceContent.hidden = true; }
 function showWaiting(messageKey = "waitingTeacher") { yearEntry.hidden = true; waitingScreen.hidden = false; practiceContent.hidden = true; waitingScreen.querySelector("h2").textContent = t(messageKey); waitingYear.textContent = yearLevelId ? yearLevelLabel(yearLevelId) : ""; }
 
 class StudentPractice {
   constructor(id) {
-    this.id = id; this.data = normalizeDifferentiatedPractice(null, ""); this.label = ""; this.teacherAudioUrl = ""; this.selectedWordId = null; this.selectedVocabularyId = "";
+    this.id = id; this.data = normalizeDifferentiatedPractice(null, ""); this.label = ""; this.teacherAudioUrl = ""; this.selectedWordId = null; this.selectedVocabularyId = ""; this.meaningTimer = null;
     const storedVoice = yearLevelId ? loadYearVoiceMode(yearLevelId, id) : null;
     this.hasVoicePreference = Boolean(storedVoice); this.selectedVoice = storedVoice || "ai"; this.studentAudioUrl = ""; this.recorder = new LocalRecorder();
-    this.root = document.querySelector(`[data-student-practice="${id}"]`); this.sentence = this.root.querySelector(`[data-sentence="${id}"]`); this.meaning = this.root.querySelector(`[data-meaning="${id}"]`); this.status = this.root.querySelector(`[data-status="${id}"]`); this.studentAudio = this.root.querySelector(`[data-student-audio="${id}"]`); this.modelAudio = this.root.querySelector(`[data-model-audio="${id}"]`);
+    this.root = document.querySelector(`[data-student-practice="${id}"]`); this.sentence = this.root.querySelector(`[data-sentence="${id}"]`); this.status = this.root.querySelector(`[data-status="${id}"]`); this.studentAudio = this.root.querySelector(`[data-student-audio="${id}"]`); this.modelAudio = this.root.querySelector(`[data-model-audio="${id}"]`);
+    this.popover = document.createElement("div"); this.popover.className = "meaning-popover"; this.popover.hidden = true; this.popover.setAttribute("role", "status"); this.popover.setAttribute("aria-live", "polite"); document.body.append(this.popover);
     this.bindControls();
   }
 
@@ -80,12 +80,34 @@ class StudentPractice {
 
   renderSentence() {
     const wrapper = document.createElement("div"); wrapper.className = "sentence-units";
-    this.currentWords().forEach(word => { const unit = document.createElement("button"); unit.type = "button"; unit.dataset.wordId = word.id; unit.className = `word-unit ${settings.enableTap ? "interactive" : ""} ${settings.enableHover ? "hover-enabled" : ""} ${this.selectedWordId === word.id ? "selected" : ""}`; unit.innerHTML = `<span class="word-pinyin" ${settings.showPinyin ? "" : "hidden"}>${escapeHtml(word.pinyin)}</span><span class="word-hanzi">${escapeHtml(word.hanzi)}</span>`; if (settings.enableTap) unit.addEventListener("click", event => { event.stopPropagation(); this.setSelection(this.selectedWordId === word.id ? null : word.id); }); if (settings.enableHover) { unit.addEventListener("mouseenter", () => this.setSelection(word.id)); unit.addEventListener("mouseleave", () => this.setSelection(null)); } wrapper.append(unit); });
-    this.sentence.replaceChildren(wrapper); this.renderMeaning();
+    const words = this.currentWords(); let hasFinalPunctuation = false;
+    words.forEach((word, index) => {
+      const { text, punctuation } = splitWordPunctuation(word.hanzi); hasFinalPunctuation = index === words.length - 1 && Boolean(punctuation);
+      if (text) {
+        const unit = document.createElement("button"); unit.type = "button"; unit.dataset.wordId = word.id; unit.className = `word-unit ${settings.enableTap ? "interactive" : ""} ${this.selectedWordId === word.id ? "selected" : ""}`;
+        const pinyin = document.createElement("span"); pinyin.className = "word-pinyin"; pinyin.textContent = word.pinyin;
+        const hanzi = document.createElement("span"); hanzi.className = "word-hanzi"; hanzi.textContent = text; unit.append(pinyin, hanzi);
+        if (settings.enableTap && word.meaning) unit.addEventListener("click", event => { event.stopPropagation(); this.showMeaning(word.meaning, unit, event, word.id); });
+        wrapper.append(unit);
+      }
+      if (punctuation) { const mark = document.createElement("span"); mark.className = "sentence-punctuation"; mark.textContent = punctuation; wrapper.append(mark); }
+    });
+    if (!hasFinalPunctuation) { const mark = document.createElement("span"); mark.className = "sentence-punctuation"; mark.textContent = "。"; wrapper.append(mark); }
+    this.sentence.replaceChildren(wrapper);
   }
 
-  setSelection(id) { this.selectedWordId = id; this.sentence.querySelectorAll(".word-unit").forEach(unit => unit.classList.toggle("selected", unit.dataset.wordId === id)); this.renderMeaning(); }
-  renderMeaning() { this.meaning.hidden = !settings.showMeanings; const word = this.currentWords().find(item => item.id === this.selectedWordId); this.meaning.innerHTML = word ? `<div class="meaning-content"><strong>${escapeHtml(word.hanzi)}</strong><span>${escapeHtml(word.pinyin)}</span><span>${escapeHtml(word.meaning)}</span></div>` : `<p class="meaning-prompt">${escapeHtml(t("tapPrompt"))}</p>`; }
+  showMeaning(meaning, anchor, event, wordId = null) {
+    if (!settings.showMeanings || !meaning) return;
+    clearTimeout(this.meaningTimer); this.selectedWordId = wordId;
+    this.sentence.querySelectorAll(".word-unit").forEach(unit => unit.classList.toggle("selected", unit.dataset.wordId === wordId));
+    this.popover.textContent = meaning; this.popover.hidden = false;
+    const anchorRect = anchor.getBoundingClientRect(); const popoverRect = this.popover.getBoundingClientRect();
+    const pointerX = Number.isFinite(event?.clientX) && event.clientX > 0 ? event.clientX : anchorRect.left + anchorRect.width / 2;
+    const preferredTop = anchorRect.bottom + 8; const left = Math.min(window.innerWidth - popoverRect.width - 10, Math.max(10, pointerX - popoverRect.width / 2));
+    const top = preferredTop + popoverRect.height <= window.innerHeight - 10 ? preferredTop : Math.max(10, anchorRect.top - popoverRect.height - 8);
+    this.popover.style.left = `${left}px`; this.popover.style.top = `${top}px`;
+    this.meaningTimer = setTimeout(() => { this.popover.hidden = true; if (wordId) { this.selectedWordId = null; this.sentence.querySelectorAll(".word-unit").forEach(unit => unit.classList.remove("selected")); } }, 2000);
+  }
 
   async chooseVocabulary(id) {
     if (id === this.selectedVocabularyId) return;
@@ -96,16 +118,15 @@ class StudentPractice {
 
   renderVocabulary() {
     const section = this.root.querySelector(`[data-vocabulary-section="${this.id}"]`); const grid = this.root.querySelector(`[data-vocabulary-grid="${this.id}"]`);
-    const substitution = this.data.substitution; section.hidden = !substitution.enabled || !substitution.vocabulary.length; grid.replaceChildren();
+    const substitution = this.data.substitution; section.hidden = !substitution.enabled || !substitution.vocabulary.length; this.root.classList.toggle("has-vocabulary", !section.hidden); grid.replaceChildren();
     if (section.hidden) return;
     substitution.vocabulary.forEach(item => {
-      const card = document.createElement("article"); card.className = `vocabulary-card ${item.id === this.selectedVocabularyId ? "selected" : ""}`;
+      const row = document.createElement("div"); row.className = `vocabulary-list-row ${item.id === this.selectedVocabularyId ? "selected" : ""}`;
       const choose = document.createElement("button"); choose.type = "button"; choose.className = "vocabulary-choice"; choose.setAttribute("aria-pressed", String(item.id === this.selectedVocabularyId));
-      if (item.imageUrl) { const image = document.createElement("img"); image.src = item.imageUrl; image.alt = ""; image.loading = "lazy"; image.addEventListener("error", () => image.remove()); choose.append(image); }
-      else { const visual = document.createElement("span"); visual.className = "vocabulary-visual"; visual.textContent = item.emoji || item.hanzi; choose.append(visual); }
-      const hanzi = document.createElement("strong"); hanzi.textContent = item.hanzi; const pinyin = document.createElement("span"); pinyin.textContent = item.pinyin; const meaning = document.createElement("span"); meaning.textContent = item.meaning; choose.append(hanzi, pinyin, meaning); choose.addEventListener("click", () => this.chooseVocabulary(item.id));
-      const listen = document.createElement("button"); listen.type = "button"; listen.className = "vocabulary-listen"; listen.textContent = `🔊 ${t("vocabularyListen")}`; listen.setAttribute("aria-label", `${t("vocabularyListen")}: ${item.hanzi}`); listen.addEventListener("click", () => { try { speakMandarin([{ hanzi: item.hanzi }], settings.speechRate || 0.8); } catch { this.status.textContent = t("speechUnsupported"); } });
-      card.append(choose, listen); grid.append(card);
+      const text = document.createElement("span"); text.className = "vocabulary-text"; const hanzi = document.createElement("strong"); hanzi.textContent = splitWordPunctuation(item.hanzi).text; const pinyin = document.createElement("span"); pinyin.textContent = item.pinyin; text.append(hanzi, pinyin); choose.append(text);
+      choose.addEventListener("click", event => { this.chooseVocabulary(item.id); this.showMeaning(item.meaning, choose, event); });
+      const listen = document.createElement("button"); listen.type = "button"; listen.className = "vocabulary-listen"; listen.textContent = "🔊"; listen.setAttribute("aria-label", `${t("vocabularyListen")}: ${item.hanzi}`); listen.addEventListener("click", () => { try { speakMandarin([{ hanzi: item.hanzi }], settings.speechRate || 0.8); } catch { this.status.textContent = t("speechUnsupported"); } });
+      row.append(choose, listen); grid.append(row);
     });
     this.root.querySelector(`[data-restore-example="${this.id}"]`).disabled = !this.selectedVocabularyId;
     this.root.querySelector(`[data-teacher-model-note="${this.id}"]`).hidden = !(this.selectedVocabularyId && this.selectedVoice === "teacher");

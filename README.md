@@ -60,6 +60,14 @@ An optional `substitution` contains `{ enabled: true, targetWordId, vocabulary }
 - Changing or restoring a choice clears that practice's temporary student recording so recordings cannot be mistaken for a different sentence.
 - Images are remote URL references only. Version 0.6.0 adds no image upload and no Cloud Storage path.
 
+## Student presentation
+
+- Voice selection and recording controls appear before the sentence so students can track the text while listening.
+- Each semantic word remains an independent control, with its Pinyin centred directly above its Hanzi. Hanzi units touch visually without English-style spacing.
+- Existing Chinese punctuation is kept outside the interactive word control. Older lessons without terminal punctuation receive a display-only `。` fallback.
+- English meanings are on-demand: tapping or clicking a sentence word or vocabulary row opens a viewport-safe popover for about two seconds.
+- On screens at least 900px wide, the practice and compact vocabulary list use an approximately 3:1 layout. Tablet portrait and phone layouts stack without horizontal scrolling.
+
 ## Teacher Voice storage
 
 Each activity uses one fixed Cloud Storage object:

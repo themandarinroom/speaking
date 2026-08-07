@@ -75,7 +75,19 @@ export function normalizeDifferentiatedPractice(value, fallbackLabel) {
 export function substitutePracticeWords(words, substitution, selectedVocabularyId) {
   const selected = substitution?.vocabulary?.find(item => item.id === selectedVocabularyId);
   if (!substitution?.enabled || !selected) return words.map(word => ({ ...word }));
-  return words.map(word => word.id === substitution.targetWordId ? { ...word, hanzi: selected.hanzi, pinyin: selected.pinyin, meaning: selected.meaning } : { ...word });
+  return words.map(word => {
+    if (word.id !== substitution.targetWordId) return { ...word };
+    const punctuation = splitWordPunctuation(word.hanzi).punctuation;
+    return { ...word, hanzi: `${splitWordPunctuation(selected.hanzi).text}${punctuation}`, pinyin: selected.pinyin, meaning: selected.meaning };
+  });
+}
+
+const CHINESE_PUNCTUATION = /[。，？！：]+$/u;
+
+export function splitWordPunctuation(hanzi = "") {
+  const value = String(hanzi);
+  const match = value.match(CHINESE_PUNCTUATION);
+  return { text: match ? value.slice(0, -match[0].length) : value, punctuation: match?.[0] || "" };
 }
 
 export function normalizePractice(value) {
@@ -95,5 +107,6 @@ export function normalizePractice(value) {
 }
 
 export function sentenceText(words) {
-  return words.map(word => word.hanzi).join("");
+  const sentence = words.map(word => word.hanzi).join("");
+  return CHINESE_PUNCTUATION.test(sentence) ? sentence : `${sentence}。`;
 }
