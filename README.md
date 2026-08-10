@@ -1,4 +1,4 @@
-# Mandarin Speaking Practice — Version 0.6.2
+# Mandarin Speaking Practice — Version 0.7.0
 
 A bilingual, iPad-friendly classroom tool for differentiated primary-school Mandarin speaking practice. Teachers publish one current lesson per Australian primary year level. Every lesson contains Core Practice followed by Challenge Practice, and student devices update through a Firestore realtime listener.
 
@@ -58,7 +58,7 @@ An optional `substitution` contains `{ enabled: true, targetWordId, vocabulary }
 - Vocabulary Listen buttons always use device AI speech for the individual word.
 - AI Voice reads the current personalised sentence. Teacher Voice plays the original recorded model and the interface explains this when a choice is active.
 - Changing or restoring a choice clears that practice's temporary student recording so recordings cannot be mistaken for a different sentence.
-- Images are remote URL references only. Versions 0.6.0–0.6.2 add no image upload or Cloud Storage path.
+- Images are remote URL references only. Versions 0.6.0–0.7.0 add no image upload or Cloud Storage path.
 
 ## Student presentation
 

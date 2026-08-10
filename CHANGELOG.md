@@ -1,5 +1,16 @@
 # Changelog
 
+## Version 0.7.0 — August 2026
+
+### Changed
+
+- Speaking Practice now uses the Vocabulary Library’s green-and-cream visual system across the home and student year-level pages
+- The home page now provides direct year-level entry and reveals Teacher Mode only after an authorised teacher signs in
+- Student lesson identity appears above the practice card, with responsive, compact lesson titles and year badges
+- Core and Challenge Mandarin sentences now appear directly below their English titles, centred with word-level Pinyin alignment preserved
+- Key Vocabulary, practice sections, controls, and footer branding use a lighter, more compact responsive presentation
+- Language switching now sits beside the version in the footer, while The Mandarin Room brand provides the home-page link
+
 ## Version 0.6.2 — August 2026
 
 ### Fixed
