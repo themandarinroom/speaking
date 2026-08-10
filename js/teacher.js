@@ -192,7 +192,7 @@ PRACTICE_IDS.forEach(practiceId => {
 });
 
 function updatePublishButton() { publishBtn.disabled = !authorised || !currentUser || services?.auth.currentUser?.uid !== currentUser.uid || isPublishing || !isFirebaseConfigured(); }
-function updateAuthUi() { authState.textContent = currentUser ? `${t("signedInAs")}: ${currentUser.email || currentUser.displayName}` : t("signedOut"); authHelp.textContent = !isFirebaseConfigured() ? t("firebaseSetupNeeded") : currentUser && !authorised ? t("notAuthorised") : t("signInHelp"); signInBtn.hidden = Boolean(currentUser); signOutBtn.hidden = !currentUser; updatePublishButton(); }
+function updateAuthUi() { authState.textContent = currentUser ? `${t("signedInAs")}: ${currentUser.email || currentUser.displayName}` : t("signedOut"); authState.hidden = !currentUser; authHelp.textContent = !isFirebaseConfigured() ? t("firebaseSetupNeeded") : currentUser && !authorised ? t("notAuthorised") : currentUser ? "" : t("signInHelp"); signInBtn.hidden = Boolean(currentUser); signOutBtn.hidden = !currentUser; updatePublishButton(); }
 
 async function loadPublishedYearLevel() {
   loadDraft(); lastPublished.textContent = ""; renderAll(); if (!authorised || !services) return;
