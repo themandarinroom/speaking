@@ -21,9 +21,13 @@ const waitingYear = document.getElementById("waitingYear");
 const practiceContent = document.getElementById("practiceContent");
 const yearBadge = document.getElementById("yearBadge");
 const lessonHeading = document.getElementById("lessonHeading");
+const studentCardIntro = document.getElementById("studentCardIntro");
+const studentPageOverview = document.getElementById("studentPageOverview");
+const studentPageHeading = document.getElementById("studentPageHeading");
+const studentPageBadge = document.getElementById("studentPageBadge");
 
-function showYearEntry() { yearEntry.hidden = false; waitingScreen.hidden = true; practiceContent.hidden = true; }
-function showWaiting(messageKey = "waitingTeacher") { yearEntry.hidden = true; waitingScreen.hidden = false; practiceContent.hidden = true; waitingScreen.querySelector("h2").textContent = t(messageKey); waitingYear.textContent = yearLevelId ? yearLevelLabel(yearLevelId) : ""; }
+function showYearEntry() { yearEntry.hidden = false; waitingScreen.hidden = true; practiceContent.hidden = true; studentPageOverview.hidden = true; studentCardIntro.hidden = false; }
+function showWaiting(messageKey = "waitingTeacher") { yearEntry.hidden = true; waitingScreen.hidden = false; practiceContent.hidden = true; studentPageOverview.hidden = true; studentCardIntro.hidden = false; waitingScreen.querySelector("h2").textContent = t(messageKey); waitingYear.textContent = yearLevelId ? yearLevelLabel(yearLevelId) : ""; }
 
 class StudentPractice {
   constructor(id) {
@@ -31,6 +35,7 @@ class StudentPractice {
     const storedVoice = yearLevelId ? loadYearVoiceMode(yearLevelId, id) : null;
     this.hasVoicePreference = Boolean(storedVoice); this.selectedVoice = storedVoice || "ai"; this.studentAudioUrl = ""; this.recorder = new LocalRecorder();
     this.root = document.querySelector(`[data-student-practice="${id}"]`); this.sentence = this.root.querySelector(`[data-sentence="${id}"]`); this.status = this.root.querySelector(`[data-status="${id}"]`); this.studentAudio = this.root.querySelector(`[data-student-audio="${id}"]`); this.modelAudio = this.root.querySelector(`[data-model-audio="${id}"]`);
+    this.sentence.classList.add("student-title-sentence"); this.root.querySelector(`[data-practice-title="${id}"]`).after(this.sentence);
     this.popover = document.createElement("div"); this.popover.className = "meaning-popover"; this.popover.hidden = true; this.popover.setAttribute("role", "status"); this.popover.setAttribute("aria-live", "polite"); document.body.append(this.popover);
     this.bindControls();
   }
@@ -142,7 +147,7 @@ PRACTICE_IDS.forEach(id => { practices[id] = new StudentPractice(id); });
 document.getElementById("joinYearBtn").addEventListener("click", () => { location.href = `student.html?year=${encodeURIComponent(yearLevelEntry.value)}`; });
 YEAR_LEVELS.forEach(level => { const option = document.createElement("option"); option.value = level.id; option.textContent = level.label; yearLevelEntry.append(option); });
 
-function showPractices(liveUpdate = false) { yearEntry.hidden = true; waitingScreen.hidden = true; practiceContent.hidden = false; yearBadge.textContent = yearLevelLabel(yearLevelId); lessonHeading.textContent = lessonTitle || t("studentHeading"); PRACTICE_IDS.forEach(id => practices[id].render()); if (liveUpdate) PRACTICE_IDS.forEach(id => { if (!practices[id].studentAudioUrl) practices[id].status.textContent = t("liveUpdate"); }); }
+function showPractices(liveUpdate = false) { const heading = lessonTitle || t("studentHeading"); const badge = yearLevelLabel(yearLevelId); yearEntry.hidden = true; waitingScreen.hidden = true; practiceContent.hidden = false; yearBadge.textContent = badge; lessonHeading.textContent = heading; studentPageOverview.hidden = false; studentCardIntro.hidden = true; yearBadge.hidden = true; studentPageHeading.textContent = heading; studentPageBadge.textContent = badge; PRACTICE_IDS.forEach(id => practices[id].render()); if (liveUpdate) PRACTICE_IDS.forEach(id => { if (!practices[id].studentAudioUrl) practices[id].status.textContent = t("liveUpdate"); }); }
 
 async function subscribeToYearLevel() {
   if (!isValidYearLevelId(yearLevelId)) { showYearEntry(); return; }
