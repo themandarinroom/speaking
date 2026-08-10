@@ -6,37 +6,41 @@
 </head>
 <body>
   <main class="shell">
-    <header class="topbar page-header">
+    <header class="topbar page-header teacher-page-header">
       <a class="text-link" href="index.html">← <span data-i18n="backHome">Home</span></a>
-      <nav class="header-actions"><a class="button secondary" href="student.html" data-i18n="openStudent">Open Student Mode</a><button class="language-button" data-language-toggle type="button">English / 中文</button></nav>
+      <nav class="header-actions teacher-mode-links"><a class="button secondary" href="student.html" data-i18n="openStudent">Open Student Mode</a><button class="language-button" data-language-toggle type="button">English / 中文</button></nav>
+      <div class="auth-panel teacher-auth-panel">
+        <div class="teacher-auth-copy"><strong id="authState" hidden data-i18n="signedOut">Not signed in</strong><p id="authHelp" class="small" data-i18n="signInHelp">Sign in to load and publish practices.</p></div>
+        <div class="button-row"><button id="signInBtn" class="button secondary" type="button" data-i18n="signInGoogle">Sign in</button><button id="signOutBtn" class="button quiet" type="button" hidden data-i18n="signOut">Sign out</button></div>
+      </div>
     </header>
-    <section class="card">
-      <p class="eyebrow" data-i18n="teacherMode">Teacher Mode</p><h1 data-i18n="teacherHeading">Build differentiated speaking practice</h1>
+    <section class="card teacher-setup-card">
+      <div class="teacher-heading-copy"><p class="eyebrow" data-i18n="teacherMode">Teacher Mode</p><h1 data-i18n="teacherHeading">Build differentiated speaking practice</h1></div>
       <div class="publish-toolbar">
         <label class="field compact" for="yearLevelSelect"><span data-i18n="yearLevel">Year level</span><select id="yearLevelSelect"></select></label>
         <label class="field grow" for="lessonTitle"><span data-i18n="lessonTitle">Lesson Title</span><input id="lessonTitle" type="text" maxlength="80"></label>
-      </div>
-      <div class="auth-panel">
-        <div><strong id="authState" data-i18n="signedOut">Not signed in</strong><p id="authHelp" class="small" data-i18n="signInHelp">Sign in with an authorised teacher Google account to load or publish a year level.</p></div>
-        <div class="button-row"><button id="signInBtn" class="button secondary" type="button" data-i18n="signInGoogle">Sign in with Google</button><button id="signOutBtn" class="button quiet" type="button" hidden data-i18n="signOut">Sign out</button></div>
       </div>
       <p id="saveStatus" class="status saved" role="status" aria-live="polite"></p>
     </section>
 
     <section class="card settings-card">
       <h2 data-i18n="settings">Shared display and voice settings</h2>
-      <div class="setting-grid">
-        <label class="check-row"><input id="showPinyin" type="checkbox"><span data-i18n="showPinyin">Show Pinyin</span></label>
-        <label class="check-row"><input id="showMeanings" type="checkbox"><span data-i18n="showMeanings">Show English meanings</span></label>
-        <label class="check-row"><input id="enableHover" type="checkbox"><span data-i18n="enableHover">Enable desktop hover</span></label>
-        <label class="check-row"><input id="enableTap" type="checkbox"><span data-i18n="enableTap">Enable tap interaction</span></label>
+      <div class="compact-settings-layout">
+        <div class="setting-grid">
+          <label class="check-row"><input id="showPinyin" type="checkbox"><span data-i18n="showPinyin">Show Pinyin</span></label>
+          <label class="check-row"><input id="showMeanings" type="checkbox"><span data-i18n="showMeanings">Show English meanings</span></label>
+          <label class="check-row"><input id="enableHover" type="checkbox"><span data-i18n="enableHover">Enable desktop hover</span></label>
+          <label class="check-row"><input id="enableTap" type="checkbox"><span data-i18n="enableTap">Enable tap interaction</span></label>
+        </div>
+        <div class="audio-setting-stack">
+          <fieldset class="compact-fieldset"><legend data-i18n="modelAudio">Model audio</legend><div class="model-audio-options">
+            <label class="radio-row"><input name="modelAudio" type="radio" value="ai"><span data-i18n="aiVoice">AI Voice</span></label>
+            <label class="radio-row"><input name="modelAudio" type="radio" value="teacher"><span data-i18n="teacherVoice">Teacher Voice</span></label>
+            <label class="radio-row"><input name="modelAudio" type="radio" value="choice"><span data-i18n="studentChoice">Student choice</span></label>
+          </div></fieldset>
+          <label class="range-row" for="speechRate"><span data-i18n="speechRate">AI speech rate</span><input id="speechRate" type="range" min="0.5" max="1.2" value="0.8" step="0.1"><output id="speechRateValue">0.8</output></label>
+        </div>
       </div>
-      <fieldset><legend data-i18n="modelAudio">Model audio</legend>
-        <label class="radio-row"><input name="modelAudio" type="radio" value="ai"><span data-i18n="aiVoice">AI Voice</span></label>
-        <label class="radio-row"><input name="modelAudio" type="radio" value="teacher"><span data-i18n="teacherVoice">Teacher Voice</span></label>
-        <label class="radio-row"><input name="modelAudio" type="radio" value="choice"><span data-i18n="studentChoice">Student choice</span></label>
-      </fieldset>
-      <label class="range-row" for="speechRate"><span data-i18n="speechRate">AI speech rate</span><input id="speechRate" type="range" min="0.5" max="1.2" value="0.8" step="0.1"><output id="speechRateValue">0.8</output></label>
     </section>
 
     <section class="practice-editor card" data-practice="core">
