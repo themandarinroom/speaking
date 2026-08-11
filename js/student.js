@@ -38,7 +38,8 @@ class StudentPractice {
     const storedVoice = yearLevelId ? loadYearVoiceMode(yearLevelId, id) : null;
     this.hasVoicePreference = Boolean(storedVoice); this.selectedVoice = storedVoice || "ai"; this.studentAudioUrl = ""; this.recorder = new LocalRecorder();
     this.root = document.querySelector(`[data-student-practice="${id}"]`); this.sentence = this.root.querySelector(`[data-sentence="${id}"]`); this.status = this.root.querySelector(`[data-status="${id}"]`); this.studentAudio = this.root.querySelector(`[data-student-audio="${id}"]`); this.modelAudio = this.root.querySelector(`[data-model-audio="${id}"]`);
-    this.sentence.classList.add("student-title-sentence"); this.root.querySelector(`[data-practice-title="${id}"]`).after(this.sentence);
+    const practiceKind = this.root.querySelector(`[data-practice-kind="${id}"]`); const practiceTitle = this.root.querySelector(`[data-practice-title="${id}"]`); const practiceMain = this.root.querySelector(".practice-main");
+    this.sentence.classList.add("student-title-sentence"); practiceMain.prepend(practiceKind, practiceTitle, this.sentence);
     this.popover = document.createElement("div"); this.popover.className = "meaning-popover"; this.popover.hidden = true; this.popover.setAttribute("role", "status"); this.popover.setAttribute("aria-live", "polite"); document.body.append(this.popover);
     this.pinyinPositionFrame = 0; this.queuePinyinPosition = () => { cancelAnimationFrame(this.pinyinPositionFrame); this.pinyinPositionFrame = requestAnimationFrame(() => this.positionPinyin()); }; window.addEventListener("resize", this.queuePinyinPosition);
     this.bindControls();
