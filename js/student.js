@@ -37,6 +37,7 @@ class StudentPractice {
     this.root = document.querySelector(`[data-student-practice="${id}"]`); this.sentence = this.root.querySelector(`[data-sentence="${id}"]`); this.status = this.root.querySelector(`[data-status="${id}"]`); this.studentAudio = this.root.querySelector(`[data-student-audio="${id}"]`); this.modelAudio = this.root.querySelector(`[data-model-audio="${id}"]`);
     this.sentence.classList.add("student-title-sentence"); this.root.querySelector(`[data-practice-title="${id}"]`).after(this.sentence);
     this.popover = document.createElement("div"); this.popover.className = "meaning-popover"; this.popover.hidden = true; this.popover.setAttribute("role", "status"); this.popover.setAttribute("aria-live", "polite"); document.body.append(this.popover);
+    this.pinyinPositionFrame = 0; this.queuePinyinPosition = () => { cancelAnimationFrame(this.pinyinPositionFrame); this.pinyinPositionFrame = requestAnimationFrame(() => this.positionPinyin()); }; window.addEventListener("resize", this.queuePinyinPosition);
     this.bindControls();
   }
 
@@ -100,6 +101,18 @@ class StudentPractice {
     });
     if (!hasExplicitEnding) { const mark = document.createElement("span"); mark.className = "sentence-punctuation"; mark.textContent = this.fallbackPunctuation(); wrapper.append(mark); }
     this.sentence.replaceChildren(wrapper);
+    this.queuePinyinPosition();
+  }
+
+  positionPinyin() {
+    const labels = [...this.sentence.querySelectorAll(".word-pinyin")];
+    labels.forEach(label => label.style.removeProperty("--pinyin-shift"));
+    const minimumGap = 10;
+    for (let index = labels.length - 2; index >= 0; index -= 1) {
+      const currentRect = labels[index].getBoundingClientRect(); const nextRect = labels[index + 1].getBoundingClientRect();
+      const overlap = currentRect.right + minimumGap - nextRect.left;
+      if (overlap > 0) labels[index].style.setProperty("--pinyin-shift", `${-overlap}px`);
+    }
   }
 
   showMeaning(meaning, anchor, event, wordId = null) {
