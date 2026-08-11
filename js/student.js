@@ -25,6 +25,9 @@ const studentCardIntro = document.getElementById("studentCardIntro");
 const studentPageOverview = document.getElementById("studentPageOverview");
 const studentPageHeading = document.getElementById("studentPageHeading");
 const studentPageBadge = document.getElementById("studentPageBadge");
+const GENERIC_LESSON_HEADINGS = new Set(["mandarin speaking practice", "中文口语练习"]);
+
+function isGenericLessonHeading(value) { return GENERIC_LESSON_HEADINGS.has(String(value || "").trim().toLocaleLowerCase()); }
 
 function showYearEntry() { yearEntry.hidden = false; waitingScreen.hidden = true; practiceContent.hidden = true; studentPageOverview.hidden = true; studentCardIntro.hidden = false; }
 function showWaiting(messageKey = "waitingTeacher") { yearEntry.hidden = true; waitingScreen.hidden = false; practiceContent.hidden = true; studentPageOverview.hidden = true; studentCardIntro.hidden = false; waitingScreen.querySelector("h2").textContent = t(messageKey); waitingYear.textContent = yearLevelId ? yearLevelLabel(yearLevelId) : ""; }
@@ -160,7 +163,7 @@ PRACTICE_IDS.forEach(id => { practices[id] = new StudentPractice(id); });
 document.getElementById("joinYearBtn").addEventListener("click", () => { location.href = `student.html?year=${encodeURIComponent(yearLevelEntry.value)}`; });
 YEAR_LEVELS.forEach(level => { const option = document.createElement("option"); option.value = level.id; option.textContent = level.label; yearLevelEntry.append(option); });
 
-function showPractices(liveUpdate = false) { const heading = lessonTitle || t("studentHeading"); const badge = yearLevelLabel(yearLevelId); yearEntry.hidden = true; waitingScreen.hidden = true; practiceContent.hidden = false; yearBadge.textContent = badge; lessonHeading.textContent = heading; studentPageOverview.hidden = false; studentCardIntro.hidden = true; yearBadge.hidden = true; studentPageHeading.textContent = heading; studentPageBadge.textContent = badge; PRACTICE_IDS.forEach(id => practices[id].render()); if (liveUpdate) PRACTICE_IDS.forEach(id => { if (!practices[id].studentAudioUrl) practices[id].status.textContent = t("liveUpdate"); }); }
+function showPractices(liveUpdate = false) { const heading = lessonTitle || t("studentHeading"); const badge = yearLevelLabel(yearLevelId); const hideGenericHeading = isGenericLessonHeading(heading); yearEntry.hidden = true; waitingScreen.hidden = true; practiceContent.hidden = false; yearBadge.textContent = badge; lessonHeading.textContent = heading; studentPageOverview.hidden = false; studentCardIntro.hidden = true; yearBadge.hidden = true; studentPageHeading.hidden = hideGenericHeading; studentPageHeading.textContent = hideGenericHeading ? "" : heading; studentPageBadge.textContent = badge; if (hideGenericHeading) { studentPageOverview.removeAttribute("aria-labelledby"); studentPageOverview.setAttribute("aria-label", `${t("studentMode")} — ${badge}`); } else { studentPageOverview.removeAttribute("aria-label"); studentPageOverview.setAttribute("aria-labelledby", "studentPageHeading"); } PRACTICE_IDS.forEach(id => practices[id].render()); if (liveUpdate) PRACTICE_IDS.forEach(id => { if (!practices[id].studentAudioUrl) practices[id].status.textContent = t("liveUpdate"); }); }
 
 async function subscribeToYearLevel() {
   if (!isValidYearLevelId(yearLevelId)) { showYearEntry(); return; }
