@@ -1,5 +1,19 @@
 # Changelog
 
+## Version 0.8.0 — August 2026
+
+### Added
+
+- Manual or Vocabulary Library sources for each practice's Key Vocabulary
+- Reference-based loading of current published vocabulary sets and per-item Teacher Voice
+- Compact set selection, loading/failure states, and deleted-set warnings in Teacher Mode
+
+### Compatibility
+
+- Existing activities without a source remain Manual; no migration is required
+- Student vocabulary substitution and recording behaviour remain unchanged
+- Teacher Voice playback works independently of device AI speech support
+
 ## Version 0.7.0 — August 2026
 
 ### Changed

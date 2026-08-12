@@ -9,6 +9,10 @@ service firebase.storage {
       return practiceId in ['core', 'challenge'];
     }
 
+    function validStableId(value) {
+      return value.matches('[a-z0-9]+(-[a-z0-9]+)*');
+    }
+
     function isAuthorisedTeacher() {
       return request.auth != null
         && request.auth.token.email_verified == true
@@ -23,6 +27,13 @@ service firebase.storage {
         && request.resource.size < 20 * 1024 * 1024
         && request.resource.contentType.matches('audio/.*');
       allow delete: if validYearLevel(yearLevelId) && validPractice(practiceId) && isAuthorisedTeacher();
+    }
+
+    match /vocabulary/{setId}/{itemId}/{fileName} {
+      allow read: if validStableId(setId)
+        && validStableId(itemId)
+        && fileName.matches('teacher-voice-[0-9]+');
+      allow write: if false;
     }
 
     match /{allPaths=**} { allow read, write: if false; }

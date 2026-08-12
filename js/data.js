@@ -32,10 +32,12 @@ export function cloneDefaultPractice() {
 }
 
 export function cloneDefaultPractices() {
-  return {
+  const practices = {
     core: { label: "Core Practice", ...cloneDefaultPractice() },
     challenge: { label: "Challenge Practice", ...JSON.parse(JSON.stringify(DEFAULT_CHALLENGE_PRACTICE)) }
   };
+  Object.values(practices).forEach(practice => { practice.substitution = { enabled: false, targetWordId: "", keyVocabSource: "vocabulary-library", vocabularySetId: "", vocabulary: [] }; });
+  return practices;
 }
 
 export function cleanPinyin(value = "") {
@@ -59,7 +61,8 @@ export function normalizeSubstitution(value, words) {
       emoji: String(item?.emoji || "").trim()
     };
   }).filter(item => item.hanzi || item.pinyin || item.meaning);
-  return { enabled: Boolean(value?.enabled) && Boolean(targetWordId), targetWordId, vocabulary };
+  const keyVocabSource = value?.keyVocabSource === "vocabulary-library" ? "vocabulary-library" : "manual";
+  return { enabled: Boolean(value?.enabled) && Boolean(targetWordId), targetWordId, keyVocabSource, vocabularySetId: keyVocabSource === "vocabulary-library" ? String(value?.vocabularySetId || "") : "", vocabulary };
 }
 
 export function normalizeDifferentiatedPractice(value, fallbackLabel) {
