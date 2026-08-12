@@ -58,7 +58,9 @@ export function normalizeSubstitution(value, words) {
       pinyin: cleanPinyin(String(item?.pinyin || "")),
       meaning: String(item?.meaning || "").trim(),
       imageUrl: String(item?.imageUrl || "").trim(),
-      emoji: String(item?.emoji || "").trim()
+      emoji: String(item?.emoji || "").trim(),
+      aiEnabled: item?.aiEnabled !== false,
+      teacherAudioUrl: String(item?.teacherAudioUrl || "")
     };
   }).filter(item => item.hanzi || item.pinyin || item.meaning);
   const keyVocabSource = value?.keyVocabSource === "vocabulary-library" ? "vocabulary-library" : "manual";
