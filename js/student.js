@@ -6,6 +6,7 @@ import { YEAR_LEVELS, PRACTICE_IDS, isValidYearLevelId, normalizeYearLevelId, ye
 import { loadYearVoiceMode, saveYearVoiceMode } from "./storage.js";
 import { cacheSafeAudioUrl } from "./teacher-audio.js";
 import { initPageTranslations, applyTranslations, formatText, t } from "./translations.js";
+import { applyVocabularySet, loadVocabularySet } from "./vocabulary-library.js";
 
 const yearLevelId = normalizeYearLevelId(new URLSearchParams(location.search).get("year"));
 let lessonTitle = "";
@@ -148,7 +149,7 @@ class StudentPractice {
       const choose = document.createElement("button"); choose.type = "button"; choose.className = "vocabulary-choice"; choose.setAttribute("aria-pressed", String(item.id === this.selectedVocabularyId));
       const text = document.createElement("span"); text.className = "vocabulary-text"; const hanzi = document.createElement("strong"); hanzi.textContent = splitWordPunctuation(item.hanzi).text; const pinyin = document.createElement("span"); pinyin.textContent = item.pinyin; text.append(hanzi, pinyin); choose.append(text);
       choose.addEventListener("click", event => { this.chooseVocabulary(item.id); this.showMeaning(item.meaning, choose, event); });
-      const listen = document.createElement("button"); listen.type = "button"; listen.className = "vocabulary-listen"; listen.textContent = "🔊"; listen.setAttribute("aria-label", `${t("vocabularyListen")}: ${item.hanzi}`); listen.addEventListener("click", () => { try { speakMandarin([{ hanzi: item.hanzi }], settings.speechRate || 0.8, ""); } catch { this.status.textContent = t("speechUnsupported"); } });
+      const listen = document.createElement("button"); listen.type = "button"; listen.className = "vocabulary-listen"; listen.textContent = "🔊"; listen.setAttribute("aria-label", `${t(item.teacherAudioUrl ? "teacherVoice" : "vocabularyListen")}: ${item.hanzi}`); listen.addEventListener("click", async () => { try { if (item.teacherAudioUrl) { this.modelAudio.src = item.teacherAudioUrl; this.modelAudio.currentTime = 0; await this.modelAudio.play(); } else speakMandarin([{ hanzi: item.hanzi }], settings.speechRate || 0.8, ""); } catch { this.status.textContent = t(item.teacherAudioUrl ? "playbackFailed" : "speechUnsupported"); } });
       row.append(choose, listen); grid.append(row);
     });
     this.root.querySelector(`[data-restore-example="${this.id}"]`).disabled = !this.selectedVocabularyId;
@@ -171,10 +172,12 @@ async function subscribeToYearLevel() {
   showWaiting(); if (!isFirebaseConfigured()) { showWaiting("connectionError"); return; }
   try {
     const services = await getFirebaseServices(); const ref = services.firestoreSdk.doc(services.db, "yearLevels", yearLevelId);
-    unsubscribeYearLevel = services.firestoreSdk.onSnapshot(ref, snapshot => {
+    unsubscribeYearLevel = services.firestoreSdk.onSnapshot(ref, async snapshot => {
       if (!snapshot.exists() || snapshot.data().published !== true) { receivedContent = false; showWaiting(); return; }
       const wasLoaded = receivedContent; const data = snapshot.data(); lessonTitle = String(data.lessonTitle || ""); settings = { ...normalizePractice(null).settings, ...(data.displaySettings || {}), ...(data.audioSettings || {}) };
-      PRACTICE_IDS.forEach(id => practices[id].update(data.practices?.[id])); receivedContent = true; showPractices(wasLoaded);
+      const resolved = {};
+      await Promise.all(PRACTICE_IDS.map(async id => { const value = data.practices?.[id]; if (value?.substitution?.keyVocabSource === "vocabulary-library" && value.substitution.vocabularySetId) { try { resolved[id] = applyVocabularySet(value, await loadVocabularySet(value.substitution.vocabularySetId)); } catch (error) { console.error("[Speaking Vocabulary Library]", error); resolved[id] = value; } } else resolved[id] = value; }));
+      PRACTICE_IDS.forEach(id => practices[id].update(resolved[id])); receivedContent = true; showPractices(wasLoaded);
     }, error => { console.error(error); if (receivedContent) PRACTICE_IDS.forEach(id => { practices[id].teacherAudioUrl = ""; if (practices[id].selectedVoice === "teacher") practices[id].useAiFallback(); }); else showWaiting("connectionError"); });
   } catch (error) { console.error(error); showWaiting("connectionError"); }
 }

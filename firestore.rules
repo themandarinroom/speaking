@@ -32,13 +32,17 @@ service cloud.firestore {
         && practice.words.size() <= 50
         && (!practice.keys().hasAny(['substitution'])
           || (practice.substitution is map
-            && practice.substitution.keys().hasOnly(['enabled', 'targetWordId', 'vocabulary'])
+            && practice.substitution.keys().hasOnly(['enabled', 'targetWordId', 'vocabulary', 'keyVocabSource', 'vocabularySetId'])
             && practice.substitution.enabled == true
             && practice.substitution.targetWordId is string
             && practice.substitution.targetWordId.size() > 0
-            && practice.substitution.vocabulary is list
-            && practice.substitution.vocabulary.size() > 0
-            && practice.substitution.vocabulary.size() <= 20))
+            && ((!practice.substitution.keys().hasAny(['keyVocabSource']) || practice.substitution.keyVocabSource == 'manual')
+              && practice.substitution.vocabulary is list
+              && practice.substitution.vocabulary.size() > 0
+              && practice.substitution.vocabulary.size() <= 20
+              || practice.substitution.keyVocabSource == 'vocabulary-library'
+                && practice.substitution.vocabularySetId is string
+                && practice.substitution.vocabularySetId.matches('[a-z0-9]+(-[a-z0-9]+)*'))))
         && (!practice.keys().hasAny(['teacherAudio'])
           || validTeacherAudio(practice.teacherAudio, 'teacher-recordings/' + yearLevelId + '/' + practiceId + '/latest'));
     }
@@ -73,6 +77,16 @@ service cloud.firestore {
     match /authorizedTeachers/{teacherId} {
       allow get: if request.auth != null && request.auth.uid == teacherId;
       allow list, create, update, delete: if false;
+    }
+
+    match /vocabularySets/{setId} {
+      allow get, list: if resource.data.published == true;
+      allow write: if false;
+    }
+
+    match /vocabularyTeacherVoices/{voiceId} {
+      allow get: if true;
+      allow list, write: if false;
     }
 
     match /{document=**} { allow read, write: if false; }

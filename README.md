@@ -1,4 +1,4 @@
-# Mandarin Speaking Practice — Version 0.7.0
+# Mandarin Speaking Practice — Version 0.8.0
 
 A bilingual, iPad-friendly classroom tool for differentiated primary-school Mandarin speaking practice. Teachers publish one current lesson per Australian primary year level. Every lesson contains Core Practice followed by Challenge Practice, and student devices update through a Firestore realtime listener.
 
@@ -49,13 +49,15 @@ Its shape is:
 }
 ```
 
-An optional `substitution` contains `{ enabled: true, targetWordId, vocabulary }`. Each vocabulary item has a stable `id`, `hanzi`, lowercase toneless `pinyin`, `meaning`, and optional `imageUrl` and `emoji`. Older documents without this field remain fully compatible.
+An optional manual `substitution` contains `{ enabled: true, targetWordId, keyVocabSource: "manual", vocabulary }`. Each manual item has a stable `id`, `hanzi`, lowercase toneless `pinyin`, `meaning`, and optional `imageUrl` and `emoji`. Older documents without `keyVocabSource` remain Manual and fully compatible.
+
+Vocabulary Library mode instead stores only `{ enabled: true, targetWordId, keyVocabSource: "vocabulary-library", vocabularySetId }`. Speaking reads the current published set from `vocabularySets/{vocabularySetId}` and each available item recording from `vocabularyTeacherVoices/{vocabularySetId}--{itemId}`. It never copies Library items or audio into the Speaking lesson. Set metadata is queried for the compact teacher selector; selected set items and voice metadata are fetched only for the active reference. Vocabulary Library remains the owner and editor of this data.
 
 ## Interactive Vocabulary behaviour
 
 - A vocabulary choice replaces exactly one word, matched by stable word ID; the published example is never mutated.
 - Students can restore the example at any time. Choices are not written to Firestore or browser storage.
-- Vocabulary Listen buttons always use device AI speech for the individual word.
+- Vocabulary Listen buttons use the Vocabulary Library Teacher Voice when present and otherwise use device AI speech. The two paths remain independent.
 - AI Voice reads the current personalised sentence. Teacher Voice plays the original recorded model and the interface explains this when a choice is active.
 - Changing or restoring a choice clears that practice's temporary student recording so recordings cannot be mistaken for a different sentence.
 - Images are remote URL references only. Versions 0.6.0–0.7.0 add no image upload or Cloud Storage path.
@@ -103,7 +105,7 @@ firebase use --add
 firebase deploy --only firestore:rules,storage
 ```
 
-`firestore.rules` permits public reads of published approved year levels and teacher-only writes. `storage.rules` permits public reads of the two fixed Teacher Voice objects per approved year level and teacher-only writes. All other paths are denied.
+`firestore.rules` permits public reads of published approved year levels, published Vocabulary Library sets, and individual Teacher Voice metadata; it does not allow Speaking to write either Vocabulary Library collection. `storage.rules` permits public audio reads and teacher-only writes. All other paths are denied.
 
 ## Classroom validation workflow
 

@@ -5,6 +5,7 @@ import { YEAR_LEVELS, PRACTICE_IDS, yearLevelLabel } from "./year-levels.js";
 import { getFirebaseServices, isFirebaseConfigured } from "./firebase.js";
 import { uploadTeacherAudio, deleteTeacherAudio, cacheSafeAudioUrl } from "./teacher-audio.js";
 import { initPageTranslations, applyTranslations, formatText, t } from "./translations.js";
+import { applyVocabularySet, listVocabularySets, loadVocabularySet } from "./vocabulary-library.js";
 
 const defaultSettings = () => cloneDefaultPractice().settings;
 const makeAudioState = () => ({ dataUrl: "", blob: null, published: null, removed: false, recorder: new LocalRecorder() });
@@ -19,6 +20,7 @@ let isPublishing = false;
 const selectedWords = { core: null, challenge: null };
 const previewVocabulary = { core: "", challenge: "" };
 const audioStates = { core: makeAudioState(), challenge: makeAudioState() };
+let vocabularySetOptions = [];
 
 const yearLevelSelect = document.getElementById("yearLevelSelect");
 const lessonTitleInput = document.getElementById("lessonTitle");
@@ -34,7 +36,8 @@ const lastPublished = document.getElementById("lastPublished");
 function escapeHtml(value) { const span = document.createElement("span"); span.textContent = value; return span.innerHTML; }
 function saveDraft() {
   try {
-    saveYearDraft(yearLevelId, { lessonTitle, practices, settings });
+    const draftPractices = Object.fromEntries(PRACTICE_IDS.map(id => { const practice = JSON.parse(JSON.stringify(practices[id])); if (practice.substitution.keyVocabSource === "vocabulary-library") practice.substitution.vocabulary = []; return [id, practice]; }));
+    saveYearDraft(yearLevelId, { lessonTitle, practices: draftPractices, settings });
     saveStatus.textContent = t("saved");
   } catch { saveStatus.textContent = t("saveFailed"); }
 }
@@ -105,6 +108,31 @@ function vocabularyField(labelKey, value, fieldName, itemId, practiceId) {
   span.append(input); wrapper.append(span); return wrapper;
 }
 
+const vocabularySetLabel = set => `Year ${set.yearLevel} — ${set.title}${set.chineseTitle ? ` · ${set.chineseTitle}` : ""}`;
+
+function setVocabularyStatus(practiceId, messageKey = "", retry = false) {
+  const status = document.querySelector(`[data-vocabulary-library-status="${practiceId}"]`); status.replaceChildren();
+  if (messageKey) status.append(document.createTextNode(t(messageKey)));
+  if (retry) { const button = document.createElement("button"); button.type = "button"; button.className = "button quiet vocabulary-retry"; button.textContent = t("retry"); button.addEventListener("click", () => refreshVocabularySet(practiceId)); status.append(" ", button); }
+}
+
+async function refreshVocabularySet(practiceId) {
+  const substitution = practices[practiceId].substitution;
+  if (substitution.keyVocabSource !== "vocabulary-library" || !substitution.vocabularySetId) { setVocabularyStatus(practiceId); return; }
+  setVocabularyStatus(practiceId, "loadingVocabulary");
+  try {
+    const set = await loadVocabularySet(substitution.vocabularySetId);
+    if (!set) { substitution.vocabulary = []; setVocabularyStatus(practiceId, "vocabularySetMissing"); }
+    else { practices[practiceId] = applyVocabularySet(practices[practiceId], set); setVocabularyStatus(practiceId); }
+  } catch (error) { console.error("[Speaking Vocabulary Library]", error); setVocabularyStatus(practiceId, "vocabularyLoadFailed", true); }
+  renderVocabulary(practiceId); renderPreview(practiceId);
+}
+
+async function loadVocabularySetOptions() {
+  try { vocabularySetOptions = await listVocabularySets(); await Promise.all(PRACTICE_IDS.map(refreshVocabularySet)); PRACTICE_IDS.forEach(renderVocabulary); }
+  catch (error) { console.error("[Speaking Vocabulary Library]", error); }
+}
+
 function renderVocabulary(practiceId) {
   const substitution = practices[practiceId].substitution; const enabled = Boolean(substitution.enabled);
   document.querySelector(`[data-vocabulary-enabled="${practiceId}"]`).checked = enabled;
@@ -112,16 +140,25 @@ function renderVocabulary(practiceId) {
   const placeholder = document.createElement("option"); placeholder.value = ""; placeholder.textContent = t("chooseReplaceableWord"); target.append(placeholder);
   practices[practiceId].words.filter(word => splitWordPunctuation(word.hanzi).text).forEach(word => { const option = document.createElement("option"); option.value = word.id; option.textContent = `${word.hanzi} — ${word.pinyin}`; target.append(option); });
   target.value = substitution.targetWordId; target.disabled = !enabled;
+  const librarySource = substitution.keyVocabSource === "vocabulary-library";
+  const sourceSelect = document.querySelector(`[data-vocabulary-source="${practiceId}"]`); sourceSelect.value = substitution.keyVocabSource; sourceSelect.disabled = !enabled;
+  const setWrapper = document.querySelector(`[data-vocabulary-set-wrapper="${practiceId}"]`); setWrapper.hidden = !enabled || !librarySource;
+  const setSelect = document.querySelector(`[data-vocabulary-set="${practiceId}"]`); setSelect.replaceChildren();
+  const setPlaceholder = document.createElement("option"); setPlaceholder.value = ""; setPlaceholder.textContent = t("chooseVocabularySet"); setSelect.append(setPlaceholder);
+  vocabularySetOptions.forEach(set => { const option = document.createElement("option"); option.value = set.id; option.textContent = vocabularySetLabel(set); setSelect.append(option); });
+  if (substitution.vocabularySetId && !vocabularySetOptions.some(set => set.id === substitution.vocabularySetId)) { const missing = document.createElement("option"); missing.value = substitution.vocabularySetId; missing.textContent = t("unavailableVocabularySet"); setSelect.append(missing); }
+  setSelect.value = substitution.vocabularySetId; setSelect.disabled = !enabled;
   const rows = document.querySelector(`[data-vocabulary-rows="${practiceId}"]`); rows.replaceChildren();
   substitution.vocabulary.forEach((item, index) => {
     const row = document.createElement("div"); row.className = "vocabulary-row";
     row.append(vocabularyField("hanzi", item.hanzi, "hanzi", item.id, practiceId), vocabularyField("pinyin", item.pinyin, "pinyin", item.id, practiceId), vocabularyField("meaning", item.meaning, "meaning", item.id, practiceId), vocabularyField("imageUrl", item.imageUrl, "imageUrl", item.id, practiceId), vocabularyField("emoji", item.emoji, "emoji", item.id, practiceId));
+    row.querySelectorAll("input").forEach(input => input.disabled = librarySource);
     const actions = document.createElement("div"); actions.className = "row-actions";
     [["up", "↑", "moveUp", index === 0], ["down", "↓", "moveDown", index === substitution.vocabulary.length - 1], ["delete", "×", "deleteWord", false]].forEach(([action, symbol, labelKey, disabled]) => { const button = document.createElement("button"); button.type = "button"; button.className = `icon-button ${action === "delete" ? "delete" : ""}`; button.dataset.vocabularyAction = action; button.dataset.itemId = item.id; button.dataset.practiceId = practiceId; button.textContent = symbol; button.disabled = disabled; button.setAttribute("aria-label", t(labelKey)); actions.append(button); });
-    row.append(actions); rows.append(row);
+    actions.hidden = librarySource; row.append(actions); rows.append(row);
   });
   rows.hidden = !enabled;
-  const add = document.querySelector(`[data-add-vocabulary="${practiceId}"]`); add.disabled = !enabled || substitution.vocabulary.length >= 20; add.hidden = !enabled;
+  const add = document.querySelector(`[data-add-vocabulary="${practiceId}"]`); add.disabled = !enabled || substitution.vocabulary.length >= 20; add.hidden = !enabled || librarySource;
   const preview = document.querySelector(`[data-vocabulary-preview="${practiceId}"]`); preview.replaceChildren(); const original = document.createElement("option"); original.value = ""; original.textContent = t("restoreExample"); preview.append(original);
   substitution.vocabulary.forEach(item => { const option = document.createElement("option"); option.value = item.id; option.textContent = `${item.hanzi} — ${item.meaning}`; preview.append(option); });
   if (!substitution.vocabulary.some(item => item.id === previewVocabulary[practiceId])) previewVocabulary[practiceId] = "";
@@ -175,6 +212,8 @@ document.getElementById("speechRate").addEventListener("input", event => { setti
 PRACTICE_IDS.forEach(practiceId => {
   document.querySelector(`[data-vocabulary-enabled="${practiceId}"]`).addEventListener("change", event => { const substitution = practices[practiceId].substitution; substitution.enabled = event.target.checked; if (substitution.enabled && !substitution.targetWordId) substitution.targetWordId = practices[practiceId].words[0]?.id || ""; if (!substitution.enabled) previewVocabulary[practiceId] = ""; renderVocabulary(practiceId); renderPreview(practiceId); saveDraft(); });
   document.querySelector(`[data-target-word="${practiceId}"]`).addEventListener("change", event => { practices[practiceId].substitution.targetWordId = event.target.value; previewVocabulary[practiceId] = ""; renderVocabulary(practiceId); renderPreview(practiceId); saveDraft(); });
+  document.querySelector(`[data-vocabulary-source="${practiceId}"]`).addEventListener("change", event => { const substitution = practices[practiceId].substitution; substitution.keyVocabSource = event.target.value; substitution.vocabularySetId = ""; if (event.target.value === "vocabulary-library") substitution.vocabulary = []; renderVocabulary(practiceId); renderPreview(practiceId); saveDraft(); });
+  document.querySelector(`[data-vocabulary-set="${practiceId}"]`).addEventListener("change", async event => { practices[practiceId].substitution.vocabularySetId = event.target.value; previewVocabulary[practiceId] = ""; saveDraft(); await refreshVocabularySet(practiceId); });
   document.querySelector(`[data-add-vocabulary="${practiceId}"]`).addEventListener("click", () => { const vocabulary = practices[practiceId].substitution.vocabulary; if (vocabulary.length >= 20) return; vocabulary.push({ id: `${practiceId}-vocabulary-${Date.now()}`, hanzi: "", pinyin: "", meaning: "", imageUrl: "", emoji: "" }); renderVocabulary(practiceId); saveDraft(); });
   document.querySelector(`[data-vocabulary-preview="${practiceId}"]`).addEventListener("change", event => { previewVocabulary[practiceId] = event.target.value; selectedWords[practiceId] = null; renderPreview(practiceId); });
   const rows = document.querySelector(`[data-vocabulary-rows="${practiceId}"]`);
@@ -205,7 +244,7 @@ async function loadPublishedYearLevel() {
       settings = { ...defaultSettings(), ...(data.displaySettings || {}), ...(data.audioSettings || {}) };
       PRACTICE_IDS.forEach(id => { audioStates[id].published = data.practices?.[id]?.teacherAudio || null; });
       if (data.updatedAt?.toDate) lastPublished.textContent = formatText("lastPublished", { time: data.updatedAt.toDate().toLocaleString() });
-      publishStatus.textContent = t("yearLevelLoaded"); saveDraft();
+      publishStatus.textContent = t("yearLevelLoaded"); await Promise.all(PRACTICE_IDS.map(refreshVocabularySet)); saveDraft();
     } else publishStatus.textContent = t("yearLevelEmpty");
   } catch (error) { console.error(error); publishStatus.textContent = `${error.code || error.name}: ${error.message}`; }
   renderAll();
@@ -228,7 +267,7 @@ async function publishYearLevel() {
       }
       publishedPractices[practiceId] = { label: practices[practiceId].label, words: practices[practiceId].words };
       const substitution = practices[practiceId].substitution;
-      if (substitution.enabled && substitution.targetWordId && substitution.vocabulary.length) publishedPractices[practiceId].substitution = substitution;
+      if (substitution.enabled && substitution.targetWordId && (substitution.keyVocabSource === "vocabulary-library" ? substitution.vocabularySetId : substitution.vocabulary.length)) publishedPractices[practiceId].substitution = substitution.keyVocabSource === "vocabulary-library" ? { enabled: true, targetWordId: substitution.targetWordId, keyVocabSource: "vocabulary-library", vocabularySetId: substitution.vocabularySetId } : { enabled: true, targetWordId: substitution.targetWordId, keyVocabSource: "manual", vocabulary: substitution.vocabulary };
       if (teacherAudio) publishedPractices[practiceId].teacherAudio = teacherAudio;
     }
     await services.firestoreSdk.setDoc(services.firestoreSdk.doc(services.db, "yearLevels", yearLevelId), {
@@ -256,4 +295,4 @@ async function initialiseFirebase() {
 
 function rerenderLanguage() { applyTranslations(); renderAll(); updateAuthUi(); }
 YEAR_LEVELS.forEach(level => { const option = document.createElement("option"); option.value = level.id; option.textContent = level.label; yearLevelSelect.append(option); });
-initPageTranslations(rerenderLanguage); loadDraft(); renderAll(); updateAuthUi(); initialiseFirebase();
+initPageTranslations(rerenderLanguage); loadDraft(); renderAll(); updateAuthUi(); initialiseFirebase(); loadVocabularySetOptions();
