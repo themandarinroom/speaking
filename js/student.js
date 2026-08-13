@@ -8,11 +8,14 @@ import { cacheSafeAudioUrl } from "./teacher-audio.js";
 import { initPageTranslations, applyTranslations, formatText, t } from "./translations.js";
 import { applyVocabularySet, loadVocabularySet } from "./vocabulary-library.js";
 
-const yearLevelId = normalizeYearLevelId(new URLSearchParams(location.search).get("year"));
+const queryParameters = new URLSearchParams(location.search);
+let yearLevelId = normalizeYearLevelId(queryParameters.get("year"));
+const requestedPracticeId = String(queryParameters.get("practice") || "").trim();
 let lessonTitle = "";
 let settings = normalizePractice(null).settings;
 let receivedContent = false;
 let unsubscribeYearLevel = null;
+let unsubscribePractice = null;
 const practices = { core: null, challenge: null };
 
 const yearEntry = document.getElementById("yearEntry");
@@ -169,21 +172,53 @@ YEAR_LEVELS.forEach(level => { const option = document.createElement("option"); 
 
 function showPractices(liveUpdate = false) { const heading = lessonTitle || t("studentHeading"); const badge = yearLevelLabel(yearLevelId); const hideGenericHeading = isGenericLessonHeading(heading); yearEntry.hidden = true; waitingScreen.hidden = true; practiceContent.hidden = false; yearBadge.textContent = badge; lessonHeading.textContent = heading; studentPageOverview.hidden = false; studentCardIntro.hidden = true; yearBadge.hidden = true; studentPageHeading.hidden = hideGenericHeading; studentPageHeading.textContent = hideGenericHeading ? "" : heading; studentPageBadge.textContent = badge; if (hideGenericHeading) { studentPageOverview.removeAttribute("aria-labelledby"); studentPageOverview.setAttribute("aria-label", `${t("studentMode")} — ${badge}`); } else { studentPageOverview.removeAttribute("aria-label"); studentPageOverview.setAttribute("aria-labelledby", "studentPageHeading"); } PRACTICE_IDS.forEach(id => practices[id].render()); if (liveUpdate) PRACTICE_IDS.forEach(id => { if (!practices[id].studentAudioUrl) practices[id].status.textContent = t("liveUpdate"); }); }
 
+async function applyPracticeDocument(data) {
+  const wasLoaded = receivedContent; lessonTitle = String(data.title || data.lessonTitle || "");
+  if (isValidYearLevelId(data.yearLevelId)) yearLevelId = data.yearLevelId;
+  settings = { ...normalizePractice(null).settings, ...(data.displaySettings || {}), ...(data.audioSettings || {}) };
+  const resolved = {};
+  await Promise.all(PRACTICE_IDS.map(async id => { const value = data.practices?.[id]; if (value?.substitution?.keyVocabSource === "vocabulary-library" && value.substitution.vocabularySetId) { try { resolved[id] = applyVocabularySet(value, await loadVocabularySet(value.substitution.vocabularySetId)); } catch (error) { console.error("[Speaking Vocabulary Library]", error); resolved[id] = value; } } else resolved[id] = value; }));
+  PRACTICE_IDS.forEach(id => practices[id].update(resolved[id])); receivedContent = true; showPractices(wasLoaded);
+}
+
+function handleSubscriptionError(error) { console.error(error); if (receivedContent) PRACTICE_IDS.forEach(id => { practices[id].teacherAudioUrl = ""; if (practices[id].selectedVoice === "teacher") practices[id].useAiFallback(); }); else showWaiting("connectionError"); }
+
+function subscribeToLegacyYearLevel(services) {
+  unsubscribePractice?.(); unsubscribePractice = null;
+  const ref = services.firestoreSdk.doc(services.db, "yearLevels", yearLevelId);
+  unsubscribePractice = services.firestoreSdk.onSnapshot(ref, snapshot => {
+    if (!snapshot.exists() || snapshot.data().published !== true) { receivedContent = false; showWaiting(); return; }
+    applyPracticeDocument(snapshot.data());
+  }, handleSubscriptionError);
+}
+
+function subscribeToSavedPractice(services, practiceId, allowLegacyFallback = false) {
+  unsubscribePractice?.();
+  const ref = services.firestoreSdk.doc(services.db, "speakingPractices", practiceId);
+  unsubscribePractice = services.firestoreSdk.onSnapshot(ref, snapshot => {
+    if (!snapshot.exists() || snapshot.data().deleted === true) {
+      receivedContent = false;
+      if (allowLegacyFallback) subscribeToLegacyYearLevel(services); else showWaiting("practiceUnavailable");
+      return;
+    }
+    applyPracticeDocument(snapshot.data());
+  }, error => { if (allowLegacyFallback && error.code === "permission-denied") subscribeToLegacyYearLevel(services); else handleSubscriptionError(error); });
+}
+
 async function subscribeToYearLevel() {
-  if (!isValidYearLevelId(yearLevelId)) { showYearEntry(); return; }
+  if (!requestedPracticeId && !isValidYearLevelId(yearLevelId)) { showYearEntry(); return; }
   showWaiting(); if (!isFirebaseConfigured()) { showWaiting("connectionError"); return; }
   try {
-    const services = await getFirebaseServices(); const ref = services.firestoreSdk.doc(services.db, "yearLevels", yearLevelId);
-    unsubscribeYearLevel = services.firestoreSdk.onSnapshot(ref, async snapshot => {
-      if (!snapshot.exists() || snapshot.data().published !== true) { receivedContent = false; showWaiting(); return; }
-      const wasLoaded = receivedContent; const data = snapshot.data(); lessonTitle = String(data.lessonTitle || ""); settings = { ...normalizePractice(null).settings, ...(data.displaySettings || {}), ...(data.audioSettings || {}) };
-      const resolved = {};
-      await Promise.all(PRACTICE_IDS.map(async id => { const value = data.practices?.[id]; if (value?.substitution?.keyVocabSource === "vocabulary-library" && value.substitution.vocabularySetId) { try { resolved[id] = applyVocabularySet(value, await loadVocabularySet(value.substitution.vocabularySetId)); } catch (error) { console.error("[Speaking Vocabulary Library]", error); resolved[id] = value; } } else resolved[id] = value; }));
-      PRACTICE_IDS.forEach(id => practices[id].update(resolved[id])); receivedContent = true; showPractices(wasLoaded);
-    }, error => { console.error(error); if (receivedContent) PRACTICE_IDS.forEach(id => { practices[id].teacherAudioUrl = ""; if (practices[id].selectedVoice === "teacher") practices[id].useAiFallback(); }); else showWaiting("connectionError"); });
-  } catch (error) { console.error(error); showWaiting("connectionError"); }
+    const services = await getFirebaseServices();
+    if (requestedPracticeId) { subscribeToSavedPractice(services, requestedPracticeId); return; }
+    const stateRef = services.firestoreSdk.doc(services.db, "speakingState", yearLevelId);
+    unsubscribeYearLevel = services.firestoreSdk.onSnapshot(stateRef, snapshot => {
+      if (!snapshot.exists() || !snapshot.data().currentPracticeId) { subscribeToLegacyYearLevel(services); return; }
+      subscribeToSavedPractice(services, snapshot.data().currentPracticeId, true);
+    }, () => { subscribeToLegacyYearLevel(services); });
+  } catch (error) { handleSubscriptionError(error); }
 }
 
 function rerenderLanguage() { applyTranslations(); if (!isValidYearLevelId(yearLevelId)) showYearEntry(); else if (receivedContent) showPractices(false); else showWaiting(); }
-window.addEventListener("beforeunload", () => unsubscribeYearLevel?.());
+window.addEventListener("beforeunload", () => { unsubscribeYearLevel?.(); unsubscribePractice?.(); });
 initPageTranslations(rerenderLanguage); subscribeToYearLevel();

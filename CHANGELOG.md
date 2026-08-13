@@ -1,5 +1,26 @@
 # Changelog
 
+## Version 0.9.0 — August 2026
+
+### Added
+
+- A persistent teacher Practice Library with stable practice IDs, year filters, editing, preview, duplication, and guarded soft deletion
+- Separate Save and Publish actions: saving updates reusable library content, while publishing changes only the current year-level pointer
+- Direct stable Practice links for Unit Library lessons and teacher previews
+- Idempotent import of existing published Year 2–6 content into the Practice Library
+
+### Changed
+
+- Student Mode follows `speakingState/{yearLevelId}` and then loads the referenced saved practice
+- Teacher Voice for new and replacement recordings is stored per stable practice at `teacher-recordings/practices/{practiceId}/{core|challenge}/latest`
+- Unit Library stores `speakingPracticeId` references and identifies missing or deleted practices without copying content
+
+### Compatibility and privacy
+
+- Publishing continues to update the v0.8 `yearLevels/{yearLevelId}` snapshot, so existing student links and older clients remain compatible
+- Existing fixed year-level Teacher Voice objects remain readable; migration does not copy or delete them
+- Student recordings remain temporary local browser URLs and have no cloud write path
+
 ## Version 0.8.0 — August 2026
 
 ### Added

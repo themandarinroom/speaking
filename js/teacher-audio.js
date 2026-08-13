@@ -1,10 +1,11 @@
 const UPLOAD_TIMEOUT_MS = 60_000;
 
 export const teacherAudioPath = (yearLevelId, practiceId) => `teacher-recordings/${yearLevelId}/${practiceId}/latest`;
+export const stableTeacherAudioPath = (speakingPracticeId, practiceId) => `teacher-recordings/practices/${speakingPracticeId}/${practiceId}/latest`;
 
-export async function uploadTeacherAudio(services, yearLevelId, practiceId, blob, onProgress = () => {}) {
+export async function uploadTeacherAudio(services, ownerId, practiceId, blob, onProgress = () => {}, stable = false) {
   const authUser = services.auth.currentUser;
-  const path = teacherAudioPath(yearLevelId, practiceId);
+  const path = stable ? stableTeacherAudioPath(ownerId, practiceId) : teacherAudioPath(ownerId, practiceId);
   const contentType = blob.type || "audio/webm";
 
   if (!authUser) {
@@ -72,10 +73,10 @@ export async function uploadTeacherAudio(services, yearLevelId, practiceId, blob
   });
 }
 
-export async function deleteTeacherAudio(services, yearLevelId, practiceId) {
+export async function deleteTeacherAudio(services, ownerId, practiceId, stable = false) {
   const { ref, deleteObject } = services.storageSdk;
   try {
-    await deleteObject(ref(services.storage, teacherAudioPath(yearLevelId, practiceId)));
+    await deleteObject(ref(services.storage, stable ? stableTeacherAudioPath(ownerId, practiceId) : teacherAudioPath(ownerId, practiceId)));
   } catch (error) {
     if (error.code !== "storage/object-not-found") throw error;
   }

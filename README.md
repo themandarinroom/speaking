@@ -1,6 +1,6 @@
-# Mandarin Speaking Practice — Version 0.8.0
+# Mandarin Speaking Practice — Version 0.9.0
 
-A bilingual, iPad-friendly classroom tool for differentiated primary-school Mandarin speaking practice. Teachers publish one current lesson per Australian primary year level. Every lesson contains Core Practice followed by Challenge Practice, and student devices update through a Firestore realtime listener.
+A bilingual, iPad-friendly classroom tool for differentiated primary-school Mandarin speaking practice. Teachers save reusable Core + Challenge bundles in a persistent Practice Library, then publish one current saved practice per Australian primary year level. Student devices update through Firestore realtime listeners.
 
 Pinyin is intentionally lowercase and has no tone marks. The app does not generate Pinyin or English meanings.
 
@@ -15,6 +15,20 @@ https://<your-github-pages-domain>/speaking/student.html?year=year-6
 ```
 
 Without a valid `year` parameter, Student Mode presents a year-level selector.
+
+## Persistent practice and publishing model
+
+Each reusable practice is stored at `speakingPractices/{practiceId}` with a stable ID, year level, title, Core and Challenge definitions, shared display/audio settings, and creation/update audit fields. Save writes this document and any pending Teacher Voice replacement. It does not affect students.
+
+Publishing writes `speakingState/{yearLevelId}` with `currentPracticeId`, `publishedAt`, and `publishedBy`. Normal Student Mode follows that pointer. The same atomic batch also writes the legacy `yearLevels/{yearLevelId}` snapshot, preserving v0.8 clients and existing year-level URLs.
+
+Teacher preview and Unit Library links may open a saved practice directly:
+
+```text
+https://<your-github-pages-domain>/speaking/student.html?practice=year4-australian-states-territories
+```
+
+The migration action imports existing published Year 2–6 documents with deterministic IDs. It is idempotent and retains all legacy documents and audio paths.
 
 ## Lesson model
 
@@ -72,14 +86,21 @@ Vocabulary Library mode instead stores only `{ enabled: true, targetWordId, keyV
 
 ## Teacher Voice storage
 
-Each activity uses one fixed Cloud Storage object:
+New recordings use one fixed Cloud Storage object per stable saved practice and activity:
+
+```text
+teacher-recordings/practices/{practiceId}/core/latest
+teacher-recordings/practices/{practiceId}/challenge/latest
+```
+
+Legacy recordings remain available at:
 
 ```text
 teacher-recordings/{yearLevelId}/core/latest
 teacher-recordings/{yearLevelId}/challenge/latest
 ```
 
-Publishing a replacement overwrites only that activity’s object. Firestore stores its download URL, content type, and cache-safe revision. Only active authorised teachers can upload, replace, or delete these objects.
+Saving a replacement overwrites only that saved practice activity’s object. Firestore stores its download URL, content type, and cache-safe revision. Only active authorised teachers can upload, replace, or delete these objects.
 
 ## Privacy boundaries
 
@@ -114,20 +135,22 @@ firebase deploy --only firestore:rules,storage
 3. Edit Core and Challenge independently and configure the shared settings.
 4. Optionally enable Interactive Vocabulary, choose one replaceable word, add/reorder choices, and verify the preview.
 5. Record distinct Core and Challenge Teacher Voice audio.
-6. Publish once and confirm the corresponding `yearLevels/{yearLevelId}` document contains both activities and optional substitution data.
-7. Confirm Storage contains only `core/latest` and `challenge/latest` for that year level.
-8. Open the matching student URL on a laptop, iPad, and iPhone; confirm both cards and vocabulary update without reload.
-9. Select, switch, and restore vocabulary; verify only the chosen word changes and prior local recordings clear.
-10. Verify vocabulary Listen and personalised AI Voice, then confirm Teacher Voice still plays the original model.
-11. Replace Core audio and confirm Challenge is unchanged, then replace Challenge and confirm Core is unchanged.
-12. Test AI and Teacher Voice, including independent fallback in both cards.
-13. Record Core and Challenge student attempts independently, reload, and confirm both disappear and no student audio reaches Firebase.
-14. Verify unauthorised users cannot publish or upload.
+6. Save the practice and confirm `speakingPractices/{practiceId}` contains both activities and optional substitution data.
+7. Publish it and confirm `speakingState/{yearLevelId}.currentPracticeId` plus the compatibility `yearLevels/{yearLevelId}` snapshot.
+8. Confirm Storage contains only one `latest` object per Core/Challenge slot for the stable practice.
+9. Open the matching student URL on a laptop, iPad, and iPhone; confirm both cards and vocabulary update without reload.
+10. Select, switch, and restore vocabulary; verify only the chosen word changes and prior local recordings clear.
+11. Verify vocabulary Listen and personalised AI Voice, then confirm Teacher Voice still plays the original model.
+12. Replace Core audio and confirm Challenge is unchanged, then replace Challenge and confirm Core is unchanged.
+13. Test AI and Teacher Voice, including independent fallback in both cards.
+14. Record Core and Challenge student attempts independently, reload, and confirm both disappear and no student audio reaches Firebase.
+15. Verify unauthorised users cannot publish or upload.
 
 ## File map
 
-- `teacher.html`, `js/teacher.js` — year-level editor, dual Teacher Voice, and single-operation publishing
-- `student.html`, `js/student.js` — realtime Core/Challenge practice with independent local recorders
+- `teacher.html`, `js/teacher.js` — persistent library UI, editor, Save/Publish controls, and dual Teacher Voice
+- `js/speaking-practices.js` — stable practice persistence, migration, duplication, soft deletion, pointers, and compatibility snapshots
+- `student.html`, `js/student.js` — pointer/direct-reference realtime Core/Challenge practice with independent local recorders
 - `js/year-levels.js` — stable year-level and practice IDs
 - `js/data.js` — word-level models and differentiated defaults
 - `js/teacher-audio.js` — authenticated fixed-path upload, replacement, deletion, and revisions
