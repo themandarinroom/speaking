@@ -19,8 +19,19 @@
     </div>
   </header>
   <main class="shell teacher-shell">
-    <section class="card teacher-setup-card">
+    <section class="card speaking-library-card">
+      <div class="library-heading-row">
+        <div><p class="eyebrow" data-i18n="practiceLibrary">Practice Library</p><h1 data-i18n="yourSpeakingPractices">Your speaking practices</h1><p class="small" data-i18n="practiceLibraryHelp">Save reusable practices, then publish one current practice to each year level.</p></div>
+        <div class="button-row"><button id="migrateLegacyBtn" class="button quiet" type="button" hidden data-i18n="importPublished">Import published practices</button><button id="newPracticeBtn" class="button" type="button" disabled>＋ <span data-i18n="newPractice">New practice</span></button></div>
+      </div>
+      <div id="libraryFilters" class="library-filters" role="group" aria-label="Filter by year level"></div>
+      <p id="libraryStatus" class="status" role="status" aria-live="polite"></p>
+      <div id="practiceLibrary" class="practice-library-grid"></div>
+    </section>
+
+    <section class="card teacher-setup-card teacher-editor-section" hidden>
       <div class="teacher-heading-copy"><p class="eyebrow" data-i18n="teacherMode">Teacher Mode</p><h1 data-i18n="teacherHeading">Build differentiated speaking practice</h1></div>
+      <div class="editor-identity"><span id="editingState" class="practice-state-badge"></span></div>
       <div class="publish-toolbar">
         <label class="field compact" for="yearLevelSelect"><span data-i18n="yearLevel">Year level</span><select id="yearLevelSelect"></select></label>
         <label class="field grow" for="lessonTitle"><span data-i18n="lessonTitle">Lesson Title</span><input id="lessonTitle" type="text" maxlength="80"></label>
@@ -28,7 +39,7 @@
       <p id="saveStatus" class="status saved" role="status" aria-live="polite"></p>
     </section>
 
-    <section class="card settings-card">
+    <section class="card settings-card teacher-editor-section" hidden>
       <h2 data-i18n="settings">Shared display and voice settings</h2>
       <div class="compact-settings-layout">
         <div class="setting-grid">
@@ -48,7 +59,7 @@
       </div>
     </section>
 
-    <section class="practice-editor card" data-practice="core">
+    <section class="practice-editor card teacher-editor-section" data-practice="core" hidden>
       <p class="eyebrow" data-i18n="corePractice">Core Practice</p>
       <label class="field" for="coreLabel"><span data-i18n="practiceLabel">Practice title</span><input id="coreLabel" type="text" maxlength="60"></label>
       <h2 data-i18n="words">Word units</h2><div id="coreRows" class="word-editor"></div>
@@ -58,7 +69,7 @@
       <h2 data-i18n="preview">Live student preview</h2><div id="corePreview"></div>
     </section>
 
-    <section class="practice-editor card" data-practice="challenge">
+    <section class="practice-editor card teacher-editor-section" data-practice="challenge" hidden>
       <p class="eyebrow" data-i18n="challengePractice">Challenge Practice</p>
       <label class="field" for="challengeLabel"><span data-i18n="practiceLabel">Practice title</span><input id="challengeLabel" type="text" maxlength="60"></label>
       <h2 data-i18n="words">Word units</h2><div id="challengeRows" class="word-editor"></div>
@@ -68,9 +79,9 @@
       <h2 data-i18n="preview">Live student preview</h2><div id="challengePreview"></div>
     </section>
 
-    <section class="card publish-card">
-      <div><h2 data-i18n="publishHeading">Year-level publishing</h2><p data-i18n="publishHelp">Publish both practices and Teacher Voice to this year level.</p><p id="lastPublished" class="small"></p></div>
-      <button id="publishBtn" class="button publish-button" type="button" disabled data-i18n="publishYearLevel">Publish to Year Level</button>
+    <section class="card publish-card teacher-editor-section" hidden>
+      <div><h2 data-i18n="savePublishHeading">Save and publish</h2><p data-i18n="savePublishHelp">Save changes to the library first. Publish makes this saved version current for its year level.</p><p id="lastPublished" class="small"></p></div>
+      <div class="button-row"><button id="closeEditorBtn" class="button quiet" type="button" data-i18n="closeEditor">Close</button><button id="savePracticeBtn" class="button secondary" type="button" disabled data-i18n="savePractice">Save practice</button><button id="publishBtn" class="button publish-button" type="button" disabled data-i18n="publishYearLevel">Publish to Year Level</button></div>
       <p id="publishStatus" class="status" role="status" aria-live="polite"></p>
     </section>
   </main>

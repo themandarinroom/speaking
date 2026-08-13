@@ -6,6 +6,7 @@ import { getFirebaseServices, isFirebaseConfigured } from "./firebase.js";
 import { uploadTeacherAudio, deleteTeacherAudio, cacheSafeAudioUrl } from "./teacher-audio.js";
 import { initPageTranslations, applyTranslations, formatText, t } from "./translations.js";
 import { applyVocabularySet, listVocabularySets, loadVocabularySet } from "./vocabulary-library.js";
+import { duplicateSpeakingPractice, listSpeakingPractices, loadSpeakingPractice, migrateLegacyYearLevels, publishSpeakingPractice, saveSpeakingPractice, savedPracticePayload, softDeleteSpeakingPractice, suggestedPracticeId, uniquePracticeId } from "./speaking-practices.js";
 
 const defaultSettings = () => cloneDefaultPractice().settings;
 const makeAudioState = () => ({ dataUrl: "", blob: null, published: null, removed: false, recorder: new LocalRecorder() });
@@ -17,6 +18,12 @@ let currentUser = null;
 let authorised = false;
 let services = null;
 let isPublishing = false;
+let isSaving = false;
+let currentPracticeId = "";
+let currentSavedPractice = null;
+let editorDirty = false;
+let libraryItems = [];
+let libraryFilter = "all";
 const selectedWords = { core: null, challenge: null };
 const previewVocabulary = { core: "", challenge: "" };
 const audioStates = { core: makeAudioState(), challenge: makeAudioState() };
@@ -32,6 +39,14 @@ const signOutBtn = document.getElementById("signOutBtn");
 const publishBtn = document.getElementById("publishBtn");
 const publishStatus = document.getElementById("publishStatus");
 const lastPublished = document.getElementById("lastPublished");
+const savePracticeBtn = document.getElementById("savePracticeBtn");
+const newPracticeBtn = document.getElementById("newPracticeBtn");
+const closeEditorBtn = document.getElementById("closeEditorBtn");
+const migrateLegacyBtn = document.getElementById("migrateLegacyBtn");
+const libraryStatus = document.getElementById("libraryStatus");
+const practiceLibrary = document.getElementById("practiceLibrary");
+const libraryFilters = document.getElementById("libraryFilters");
+const editingState = document.getElementById("editingState");
 
 function escapeHtml(value) { const span = document.createElement("span"); span.textContent = value; return span.innerHTML; }
 function saveDraft() {
@@ -39,6 +54,7 @@ function saveDraft() {
     const draftPractices = Object.fromEntries(PRACTICE_IDS.map(id => { const practice = JSON.parse(JSON.stringify(practices[id])); if (practice.substitution.keyVocabSource === "vocabulary-library") practice.substitution.vocabulary = []; return [id, practice]; }));
     saveYearDraft(yearLevelId, { lessonTitle, practices: draftPractices, settings });
     saveStatus.textContent = t("saved");
+    if (currentPracticeId || !currentSavedPractice) { editorDirty = true; updatePublishButton(); }
   } catch { saveStatus.textContent = t("saveFailed"); }
 }
 
@@ -225,74 +241,133 @@ PRACTICE_IDS.forEach(practiceId => {
 PRACTICE_IDS.forEach(practiceId => {
   const state = audioStates[practiceId]; const record = document.querySelector(`[data-record="${practiceId}"]`); const stop = document.querySelector(`[data-stop="${practiceId}"]`); const status = document.querySelector(`[data-audio-status="${practiceId}"]`); const audio = document.querySelector(`[data-audio="${practiceId}"]`);
   record.addEventListener("click", async () => { try { await state.recorder.start(); record.disabled = true; stop.disabled = false; status.textContent = t("recording"); } catch (error) { status.textContent = t(error.name === "NotAllowedError" ? "microphoneDenied" : error.message === "recordingUnsupported" ? "recordingUnsupported" : "recordingFailed"); } });
-  stop.addEventListener("click", async () => { const result = await state.recorder.stop(); if (!result) return; state.blob = result.blob; state.dataUrl = await blobToDataUrl(result.blob); state.removed = false; saveYearTeacherAudio(yearLevelId, practiceId, state.dataUrl); status.textContent = t("recordingReady"); record.disabled = false; stop.disabled = true; updateAudioControls(practiceId); });
+  stop.addEventListener("click", async () => { const result = await state.recorder.stop(); if (!result) return; state.blob = result.blob; state.dataUrl = await blobToDataUrl(result.blob); state.removed = false; saveYearTeacherAudio(yearLevelId, practiceId, state.dataUrl); status.textContent = t("recordingReady"); record.disabled = false; stop.disabled = true; editorDirty = true; updateAudioControls(practiceId); updatePublishButton(); });
   document.querySelector(`[data-play="${practiceId}"]`).addEventListener("click", async () => { try { audio.currentTime = 0; await audio.play(); } catch { status.textContent = t("playbackFailed"); } });
-  document.querySelector(`[data-remove="${practiceId}"]`).addEventListener("click", () => { clearYearTeacherAudio(yearLevelId, practiceId); state.dataUrl = ""; state.blob = null; state.removed = true; status.textContent = t("recordingRemoved"); updateAudioControls(practiceId); });
+  document.querySelector(`[data-remove="${practiceId}"]`).addEventListener("click", () => { clearYearTeacherAudio(yearLevelId, practiceId); state.dataUrl = ""; state.blob = null; state.removed = true; status.textContent = t("recordingRemoved"); editorDirty = true; updateAudioControls(practiceId); updatePublishButton(); });
 });
 
-function updatePublishButton() { publishBtn.disabled = !authorised || !currentUser || services?.auth.currentUser?.uid !== currentUser.uid || isPublishing || !isFirebaseConfigured(); }
+function showEditor(show) { document.querySelectorAll(".teacher-editor-section").forEach(section => { section.hidden = !show; }); }
+function updatePublishButton() {
+  const ready = authorised && currentUser && services?.auth.currentUser?.uid === currentUser.uid && isFirebaseConfigured();
+  publishBtn.disabled = !ready || !currentSavedPractice || editorDirty || isPublishing || isSaving;
+  savePracticeBtn.disabled = !ready || isSaving || isPublishing;
+  newPracticeBtn.disabled = !ready;
+  migrateLegacyBtn.disabled = !ready || isSaving || isPublishing;
+  editingState.textContent = currentSavedPractice ? (editorDirty ? t("unsavedChanges") : t("savedPractice")) : t("newPractice");
+}
 function updateAuthUi() { authState.textContent = currentUser ? `${t("signedInAs")}: ${currentUser.email || currentUser.displayName}` : t("signedOut"); authState.hidden = !currentUser; authHelp.textContent = !isFirebaseConfigured() ? t("firebaseSetupNeeded") : currentUser && !authorised ? t("notAuthorised") : currentUser ? "" : t("signInHelp"); signInBtn.hidden = Boolean(currentUser); signOutBtn.hidden = !currentUser; updatePublishButton(); }
 
-async function loadPublishedYearLevel() {
-  loadDraft(); lastPublished.textContent = ""; renderAll(); if (!authorised || !services) return;
-  publishStatus.textContent = t("loadingYearLevel");
-  try {
-    const snapshot = await services.firestoreSdk.getDoc(services.firestoreSdk.doc(services.db, "yearLevels", yearLevelId));
-    if (snapshot.exists()) {
-      const data = snapshot.data(); lessonTitle = String(data.lessonTitle || t("defaultPracticeTitle"));
-      practices = { core: normalizeDifferentiatedPractice(data.practices?.core, t("corePractice")), challenge: normalizeDifferentiatedPractice(data.practices?.challenge, t("challengePractice")) };
-      settings = { ...defaultSettings(), ...(data.displaySettings || {}), ...(data.audioSettings || {}) };
-      PRACTICE_IDS.forEach(id => { audioStates[id].published = data.practices?.[id]?.teacherAudio || null; });
-      if (data.updatedAt?.toDate) lastPublished.textContent = formatText("lastPublished", { time: data.updatedAt.toDate().toLocaleString() });
-      publishStatus.textContent = t("yearLevelLoaded"); await Promise.all(PRACTICE_IDS.map(refreshVocabularySet)); saveDraft();
-    } else publishStatus.textContent = t("yearLevelEmpty");
-  } catch (error) { console.error(error); publishStatus.textContent = `${error.code || error.name}: ${error.message}`; }
-  renderAll();
+function formatLibraryDate(value) { return value?.toDate ? value.toDate().toLocaleDateString() : ""; }
+function renderLibrary() {
+  libraryFilters.replaceChildren();
+  [{ id: "all", label: t("allYears") }, ...YEAR_LEVELS].forEach(level => { const button = document.createElement("button"); button.type = "button"; button.className = `library-filter ${libraryFilter === level.id ? "active" : ""}`; button.textContent = level.label; button.addEventListener("click", () => { libraryFilter = level.id; renderLibrary(); }); libraryFilters.append(button); });
+  practiceLibrary.replaceChildren();
+  const visible = libraryItems.filter(item => libraryFilter === "all" || item.yearLevelId === libraryFilter);
+  if (!visible.length) { const empty = document.createElement("p"); empty.className = "library-empty"; empty.textContent = t("practiceLibraryEmpty"); practiceLibrary.append(empty); }
+  visible.forEach(item => {
+    const card = document.createElement("article"); card.className = "practice-library-item";
+    const copy = document.createElement("div"); copy.className = "practice-library-copy";
+    const badge = document.createElement("span"); badge.className = "practice-year-badge"; badge.textContent = item.yearLevelLabel || yearLevelLabel(item.yearLevelId);
+    const title = document.createElement("h2"); title.textContent = item.title; copy.append(badge, title); if (formatLibraryDate(item.updatedAt)) { const meta = document.createElement("p"); meta.className = "small"; meta.textContent = formatText("updatedOn", { date: formatLibraryDate(item.updatedAt) }); copy.append(meta); }
+    const actions = document.createElement("div"); actions.className = "library-item-actions";
+    [["edit", t("edit")], ["preview", t("preview")], ["publish", t("publish")], ["duplicate", t("duplicate")], ["delete", t("deleteWord")]].forEach(([action, label]) => { const button = document.createElement("button"); button.type = "button"; button.className = `button ${action === "delete" ? "quiet" : "secondary"}`; button.dataset.libraryAction = action; button.dataset.practiceId = item.id; button.textContent = label; actions.append(button); });
+    card.append(copy, actions); practiceLibrary.append(card);
+  });
 }
 
-yearLevelSelect.addEventListener("change", () => { yearLevelId = yearLevelSelect.value; loadPublishedYearLevel(); });
+async function refreshLibrary() {
+  if (!authorised || !services) { libraryItems = []; renderLibrary(); return; }
+  libraryStatus.textContent = t("loadingPractices");
+  try { libraryItems = await listSpeakingPractices(services); libraryStatus.textContent = ""; migrateLegacyBtn.hidden = libraryItems.some(item => item.migration) || !authorised; }
+  catch (error) { console.error(error); libraryStatus.textContent = `${error.code || error.name}: ${error.message}`; }
+  renderLibrary();
+}
+
+async function openSavedPractice(itemOrId) {
+  const item = typeof itemOrId === "string" ? await loadSpeakingPractice(services, itemOrId) : itemOrId;
+  if (!item) { libraryStatus.textContent = t("practiceUnavailable"); return; }
+  currentPracticeId = item.id; currentSavedPractice = item; yearLevelId = item.yearLevelId; yearLevelSelect.value = yearLevelId; lessonTitle = item.title;
+  yearLevelSelect.disabled = true;
+  practices = { core: normalizeDifferentiatedPractice(item.practices.core, t("corePractice")), challenge: normalizeDifferentiatedPractice(item.practices.challenge, t("challengePractice")) };
+  settings = { ...defaultSettings(), ...item.displaySettings, ...item.audioSettings };
+  PRACTICE_IDS.forEach(id => { const state = audioStates[id]; state.dataUrl = ""; state.blob = null; state.published = item.practices[id]?.teacherAudio || null; state.removed = false; });
+  editorDirty = false; publishStatus.textContent = ""; lastPublished.textContent = ""; showEditor(true); renderAll(); await Promise.all(PRACTICE_IDS.map(refreshVocabularySet)); renderAll(); document.querySelector(".teacher-setup-card").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function newPractice() {
+  currentPracticeId = ""; currentSavedPractice = null; yearLevelId = YEAR_LEVELS[0].id; yearLevelSelect.value = yearLevelId; lessonTitle = t("defaultPracticeTitle"); practices = cloneDefaultPractices(); settings = defaultSettings();
+  yearLevelSelect.disabled = false;
+  PRACTICE_IDS.forEach(id => { audioStates[id].dataUrl = ""; audioStates[id].blob = null; audioStates[id].published = null; audioStates[id].removed = false; });
+  editorDirty = true; publishStatus.textContent = ""; lastPublished.textContent = ""; showEditor(true); renderAll(); document.querySelector(".teacher-setup-card").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+yearLevelSelect.addEventListener("change", () => { yearLevelId = yearLevelSelect.value; editorDirty = true; updatePublishButton(); });
 signInBtn.addEventListener("click", async () => { if (!services) return; try { await services.authSdk.signInWithPopup(services.auth, new services.authSdk.GoogleAuthProvider()); } catch { authHelp.textContent = t("authFailed"); } });
 signOutBtn.addEventListener("click", () => services?.authSdk.signOut(services.auth));
 
-async function publishYearLevel() {
-  if (!authorised || !services || !currentUser || services.auth.currentUser?.uid !== currentUser.uid || isPublishing) return;
-  isPublishing = true; updatePublishButton(); publishStatus.textContent = t("publishing");
+async function saveCurrentPractice() {
+  if (!authorised || !services || !currentUser || isSaving) return null;
+  isSaving = true; updatePublishButton(); publishStatus.textContent = t("savingPractice");
   try {
-    const publishedPractices = {};
+    if (!currentPracticeId) currentPracticeId = await uniquePracticeId(services, suggestedPracticeId(yearLevelId, lessonTitle));
+    const teacherAudioByPractice = {};
     for (const practiceId of PRACTICE_IDS) {
-      const state = audioStates[practiceId]; let teacherAudio = state.removed ? null : state.published;
+      const state = audioStates[practiceId]; let audioMetadata = state.removed ? null : state.published;
       if (state.dataUrl) {
         const blob = state.blob || await fetch(state.dataUrl).then(response => response.blob());
-        teacherAudio = await uploadTeacherAudio(services, yearLevelId, practiceId, blob, percent => { publishStatus.textContent = formatText("uploadingPracticeVoice", { practice: practices[practiceId].label, percent }); });
+        audioMetadata = await uploadTeacherAudio(services, currentPracticeId, practiceId, blob, percent => { publishStatus.textContent = formatText("uploadingPracticeVoice", { practice: practices[practiceId].label, percent }); }, true);
       }
-      publishedPractices[practiceId] = { label: practices[practiceId].label, words: practices[practiceId].words };
-      const substitution = practices[practiceId].substitution;
-      if (substitution.enabled && substitution.targetWordId && (substitution.keyVocabSource === "vocabulary-library" ? substitution.vocabularySetId : substitution.vocabulary.length)) publishedPractices[practiceId].substitution = substitution.keyVocabSource === "vocabulary-library" ? { enabled: true, targetWordId: substitution.targetWordId, keyVocabSource: "vocabulary-library", vocabularySetId: substitution.vocabularySetId } : { enabled: true, targetWordId: substitution.targetWordId, keyVocabSource: "manual", vocabulary: substitution.vocabulary };
-      if (teacherAudio) publishedPractices[practiceId].teacherAudio = teacherAudio;
+      if (audioMetadata) teacherAudioByPractice[practiceId] = audioMetadata;
     }
-    await services.firestoreSdk.setDoc(services.firestoreSdk.doc(services.db, "yearLevels", yearLevelId), {
-      yearLevelId, yearLevelLabel: yearLevelLabel(yearLevelId), lessonTitle: lessonTitle || t("defaultPracticeTitle"), practices: publishedPractices,
-      displaySettings: { showPinyin: settings.showPinyin, showMeanings: settings.showMeanings, enableHover: settings.enableHover, enableTap: settings.enableTap },
-      audioSettings: { modelAudio: settings.modelAudio, speechRate: Number(settings.speechRate) || 0.8 }, published: true, updatedAt: services.firestoreSdk.serverTimestamp()
-    });
+    const payload = savedPracticePayload({ id: currentPracticeId, yearLevelId, title: lessonTitle, practices, settings, teacherAudio: teacherAudioByPractice });
+    currentSavedPractice = await saveSpeakingPractice(services, payload, currentUser, !currentSavedPractice);
     for (const practiceId of PRACTICE_IDS) {
       const state = audioStates[practiceId];
-      if (state.removed && state.published) await deleteTeacherAudio(services, yearLevelId, practiceId);
-      state.published = publishedPractices[practiceId].teacherAudio || null; state.blob = null; state.removed = false;
+      if (state.removed && state.published?.path?.startsWith("teacher-recordings/practices/")) await deleteTeacherAudio(services, currentPracticeId, practiceId, true);
+      state.published = currentSavedPractice.practices[practiceId]?.teacherAudio || null; state.blob = null; state.removed = false;
       if (state.dataUrl) { clearYearTeacherAudio(yearLevelId, practiceId); state.dataUrl = ""; }
       updateAudioControls(practiceId);
     }
-    publishStatus.textContent = t("publishSuccess"); lastPublished.textContent = formatText("lastPublished", { time: new Date().toLocaleString() });
-  } catch (error) { console.error(error); publishStatus.textContent = `${error.code || error.name || "FirebaseError"}: ${error.message || t("publishFailed")}`; }
+    editorDirty = false; publishStatus.textContent = t("practiceSaved"); await refreshLibrary(); return currentSavedPractice;
+  } catch (error) { console.error(error); publishStatus.textContent = `${error.code || error.name || "FirebaseError"}: ${error.message || t("saveFailed")}`; return null; }
+  finally { isSaving = false; updatePublishButton(); }
+}
+
+async function publishYearLevel(saved = currentSavedPractice, fromLibrary = false) {
+  if (!authorised || !services || !currentUser || !saved || isPublishing) return;
+  const status = fromLibrary ? libraryStatus : publishStatus;
+  if (editorDirty && saved.id === currentPracticeId) { status.textContent = t("saveBeforePublish"); return; }
+  isPublishing = true; updatePublishButton(); status.textContent = t("publishing");
+  try { await publishSpeakingPractice(services, saved, currentUser); status.textContent = t("publishSuccess"); if (!fromLibrary) lastPublished.textContent = formatText("lastPublished", { time: new Date().toLocaleString() }); }
+  catch (error) { console.error(error); status.textContent = `${error.code || error.name || "FirebaseError"}: ${error.message || t("publishFailed")}`; }
   finally { isPublishing = false; updatePublishButton(); }
 }
 
 publishBtn.addEventListener("click", publishYearLevel);
+savePracticeBtn.addEventListener("click", saveCurrentPractice);
+newPracticeBtn.addEventListener("click", newPractice);
+closeEditorBtn.addEventListener("click", () => { if (!editorDirty || window.confirm(t("discardUnsaved"))) { showEditor(false); currentPracticeId = ""; currentSavedPractice = null; editorDirty = false; updatePublishButton(); } });
+practiceLibrary.addEventListener("click", async event => {
+  const button = event.target.closest("button[data-library-action]"); if (!button) return; const item = libraryItems.find(value => value.id === button.dataset.practiceId); if (!item) return;
+  const action = button.dataset.libraryAction;
+  if (action === "edit") await openSavedPractice(item);
+  if (action === "preview") window.open(`student.html?practice=${encodeURIComponent(item.id)}`, "_blank", "noopener");
+  if (action === "publish") await publishYearLevel(item, true);
+  if (action === "duplicate") { libraryStatus.textContent = t("duplicating"); try { const duplicate = await duplicateSpeakingPractice(services, item, currentUser); await refreshLibrary(); await openSavedPractice(duplicate); libraryStatus.textContent = t("practiceDuplicated"); } catch (error) { libraryStatus.textContent = `${error.code || error.name}: ${error.message}`; } }
+  if (action === "delete") {
+    const stateRefs = await Promise.all(YEAR_LEVELS.map(level => services.firestoreSdk.getDoc(services.firestoreSdk.doc(services.db, "speakingState", level.id))));
+    if (stateRefs.some(snapshot => snapshot.exists() && snapshot.data().currentPracticeId === item.id)) { libraryStatus.textContent = t("cannotDeletePublished"); return; }
+    let unitCount = 0; try { const units = await services.firestoreSdk.getDocs(services.firestoreSdk.collection(services.db, "units")); units.forEach(unit => { if (JSON.stringify(unit.data()).includes(`"speakingPracticeId":"${item.id}"`)) unitCount += 1; }); } catch (error) { console.warn("[Speaking Practice delete safeguard] Unit scan unavailable", error); libraryStatus.textContent = t("unitCheckFailed"); return; }
+    if (unitCount) { libraryStatus.textContent = formatText("cannotDeleteUnitReference", { count: unitCount }); return; }
+    if (window.confirm(formatText("confirmDeletePractice", { title: item.title }))) { await softDeleteSpeakingPractice(services, item.id, currentUser); await refreshLibrary(); }
+  }
+});
+migrateLegacyBtn.addEventListener("click", async () => { if (!window.confirm(t("confirmImportPublished"))) return; isSaving = true; updatePublishButton(); libraryStatus.textContent = t("importingPublished"); try { const ids = await migrateLegacyYearLevels(services, currentUser); libraryStatus.textContent = formatText("importComplete", { count: ids.length }); await refreshLibrary(); } catch (error) { console.error(error); libraryStatus.textContent = `${error.code || error.name}: ${error.message}`; } finally { isSaving = false; updatePublishButton(); } });
 async function initialiseFirebase() {
   services = await getFirebaseServices(); if (!services) { updateAuthUi(); return; }
-  services.authSdk.onAuthStateChanged(services.auth, async user => { currentUser = user; authorised = false; if (user) { try { const snapshot = await services.firestoreSdk.getDoc(services.firestoreSdk.doc(services.db, "authorizedTeachers", user.uid)); authorised = snapshot.exists() && snapshot.data().active === true; } catch { authorised = false; } } updateAuthUi(); await loadPublishedYearLevel(); });
+  services.authSdk.onAuthStateChanged(services.auth, async user => { currentUser = user; authorised = false; if (user) { try { const snapshot = await services.firestoreSdk.getDoc(services.firestoreSdk.doc(services.db, "authorizedTeachers", user.uid)); authorised = snapshot.exists() && snapshot.data().active === true; } catch { authorised = false; } } updateAuthUi(); await refreshLibrary(); const requested = new URLSearchParams(location.search).get("practice"); if (authorised && requested) await openSavedPractice(requested); });
 }
 
-function rerenderLanguage() { applyTranslations(); renderAll(); updateAuthUi(); }
+function rerenderLanguage() { applyTranslations(); renderLibrary(); if (!document.querySelector(".teacher-setup-card").hidden) renderAll(); updateAuthUi(); }
 YEAR_LEVELS.forEach(level => { const option = document.createElement("option"); option.value = level.id; option.textContent = level.label; yearLevelSelect.append(option); });
-initPageTranslations(rerenderLanguage); loadDraft(); renderAll(); updateAuthUi(); initialiseFirebase(); loadVocabularySetOptions();
+initPageTranslations(rerenderLanguage); loadDraft(); renderAll(); showEditor(false); renderLibrary(); updateAuthUi(); initialiseFirebase(); loadVocabularySetOptions();

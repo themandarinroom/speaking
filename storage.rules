@@ -29,11 +29,30 @@ service firebase.storage {
       allow delete: if validYearLevel(yearLevelId) && validPractice(practiceId) && isAuthorisedTeacher();
     }
 
+    match /teacher-recordings/practices/{speakingPracticeId}/{practiceId}/latest {
+      allow read: if validStableId(speakingPracticeId) && validPractice(practiceId);
+      allow create, update: if validStableId(speakingPracticeId)
+        && validPractice(practiceId)
+        && isAuthorisedTeacher()
+        && request.resource.size < 20 * 1024 * 1024
+        && request.resource.contentType.matches('audio/.*');
+      allow delete: if validStableId(speakingPracticeId) && validPractice(practiceId) && isAuthorisedTeacher();
+    }
+
     match /vocabulary/{setId}/{itemId}/{fileName} {
       allow read: if validStableId(setId)
         && validStableId(itemId)
         && fileName.matches('teacher-voice-[0-9]+');
-      allow write: if false;
+      allow create, update: if validStableId(setId)
+        && validStableId(itemId)
+        && fileName.matches('teacher-voice-[0-9]+')
+        && isAuthorisedTeacher()
+        && request.resource.size < 20 * 1024 * 1024
+        && request.resource.contentType.matches('audio/.*');
+      allow delete: if validStableId(setId)
+        && validStableId(itemId)
+        && fileName.matches('teacher-voice-[0-9]+')
+        && isAuthorisedTeacher();
     }
 
     match /{allPaths=**} { allow read, write: if false; }
