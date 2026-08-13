@@ -2,18 +2,23 @@
 <html lang="en">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Teacher Mode</title><link rel="stylesheet" href="css/styles.css">
+  <title>Teacher Mode</title><link rel="stylesheet" href="css/styles.css?v=teacher-green-cream-1">
 </head>
-<body>
-  <main class="shell">
-    <header class="topbar page-header teacher-page-header">
-      <a class="text-link" href="index.html">← <span data-i18n="backHome">Home</span></a>
-      <nav class="header-actions teacher-mode-links"><a class="button secondary" href="student.html" data-i18n="openStudent">Open Student Mode</a><button class="language-button" data-language-toggle type="button">English / 中文</button></nav>
-      <div class="auth-panel teacher-auth-panel">
-        <div class="teacher-auth-copy"><strong id="authState" hidden data-i18n="signedOut">Not signed in</strong><p id="authHelp" class="small" data-i18n="signInHelp">Sign in to load and publish practices.</p></div>
-        <div class="button-row"><button id="signInBtn" class="button secondary" type="button" data-i18n="signInGoogle">Sign in</button><button id="signOutBtn" class="button quiet" type="button" hidden data-i18n="signOut">Sign out</button></div>
-      </div>
-    </header>
+<body class="teacher-page">
+  <header class="teacher-site-header">
+    <a class="landing-brand" href="index.html" aria-label="Speaking Practice home">
+      <span class="landing-brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" role="img"><rect x="8" y="3" width="8" height="12" rx="4"></rect><path d="M5 11a7 7 0 0 0 14 0M12 18v3M9 21h6"></path></svg>
+      </span>
+      <span class="landing-brand-copy"><strong>The Mandarin Room</strong><small>Speaking Practice</small></span>
+    </a>
+    <nav class="teacher-mode-links" aria-label="Teacher page tools"><a class="teacher-header-link" href="student.html" data-i18n="openStudent">Open Student Mode</a><button class="teacher-language-button" data-language-toggle type="button">English / 中文</button></nav>
+    <div class="auth-panel teacher-auth-panel">
+      <div class="teacher-auth-copy"><strong id="authState" hidden data-i18n="signedOut">Not signed in</strong><p id="authHelp" class="small" data-i18n="signInHelp">Sign in to load and publish practices.</p></div>
+      <div class="button-row"><button id="signInBtn" class="button secondary" type="button" data-i18n="signInGoogle">Sign in</button><button id="signOutBtn" class="button quiet" type="button" hidden data-i18n="signOut">Sign out</button></div>
+    </div>
+  </header>
+  <main class="shell teacher-shell">
     <section class="card teacher-setup-card">
       <div class="teacher-heading-copy"><p class="eyebrow" data-i18n="teacherMode">Teacher Mode</p><h1 data-i18n="teacherHeading">Build differentiated speaking practice</h1></div>
       <div class="publish-toolbar">
