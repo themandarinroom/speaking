@@ -2,6 +2,11 @@
 
 ## Version 0.9.0 — August 2026
 
+### Vocabulary editor patch v0.4.3
+
+- Pinyin fields preserve spaces while teachers type and normalize only when editing finishes
+- Interactive Vocabulary sections are collapsed by default and can be expanded when needed
+
 ### Added
 
 - A persistent teacher Practice Library with stable practice IDs, year filters, editing, preview, duplication, and guarded soft deletion

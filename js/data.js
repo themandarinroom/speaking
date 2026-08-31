@@ -44,6 +44,10 @@ export function cleanPinyin(value = "") {
   return value.toLowerCase().replace(/[^a-z\s'-]/g, "").replace(/\s+/g, " ").trim();
 }
 
+export function cleanPinyinInput(value = "") {
+  return value.toLowerCase().replace(/[^a-z\s'-]/g, "").replace(/\s+/g, " ").replace(/^\s+/, "");
+}
+
 export function normalizeSubstitution(value, words) {
   const wordIds = new Set(words.filter(word => splitWordPunctuation(word.hanzi).text).map(word => word.id));
   const targetWordId = wordIds.has(String(value?.targetWordId || "")) ? String(value.targetWordId) : "";
