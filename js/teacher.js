@@ -1,4 +1,4 @@
-import { cleanPinyin, cloneDefaultPractice, cloneDefaultPractices, normalizeDifferentiatedPractice, splitWordPunctuation, substitutePracticeWords } from "./data.js";
+import { cleanPinyin, cleanPinyinInput, cloneDefaultPractice, cloneDefaultPractices, normalizeDifferentiatedPractice, splitWordPunctuation, substitutePracticeWords } from "./data.js";
 import { loadYearDraft, saveYearDraft, loadYearTeacherAudio, saveYearTeacherAudio, clearYearTeacherAudio } from "./storage.js";
 import { LocalRecorder, blobToDataUrl } from "./recorder.js";
 import { YEAR_LEVELS, PRACTICE_IDS, yearLevelLabel } from "./year-levels.js";
@@ -204,9 +204,14 @@ document.querySelectorAll(".word-editor").forEach(rows => {
   rows.addEventListener("input", event => {
     const input = event.target.closest("input[data-field]"); if (!input) return;
     const practice = practices[input.dataset.practiceId]; const word = practice.words.find(item => item.id === input.dataset.wordId); if (!word) return;
-    word[input.dataset.field] = input.dataset.field === "pinyin" ? cleanPinyin(input.value) : input.value;
+    word[input.dataset.field] = input.dataset.field === "pinyin" ? cleanPinyinInput(input.value) : input.value;
     if (input.dataset.field === "pinyin" && input.value !== word.pinyin) input.value = word.pinyin;
     renderPreview(input.dataset.practiceId); saveDraft();
+  });
+  rows.addEventListener("focusout", event => {
+    const input = event.target.closest('input[data-field="pinyin"]'); if (!input) return;
+    const practice = practices[input.dataset.practiceId]; const word = practice.words.find(item => item.id === input.dataset.wordId); if (!word) return;
+    word.pinyin = cleanPinyin(input.value); input.value = word.pinyin; renderPreview(input.dataset.practiceId); saveDraft();
   });
   rows.addEventListener("click", event => {
     const button = event.target.closest("button[data-action]"); if (!button) return;
@@ -233,7 +238,8 @@ PRACTICE_IDS.forEach(practiceId => {
   document.querySelector(`[data-add-vocabulary="${practiceId}"]`).addEventListener("click", () => { const vocabulary = practices[practiceId].substitution.vocabulary; if (vocabulary.length >= 20) return; vocabulary.push({ id: `${practiceId}-vocabulary-${Date.now()}`, hanzi: "", pinyin: "", meaning: "", imageUrl: "", emoji: "" }); renderVocabulary(practiceId); saveDraft(); });
   document.querySelector(`[data-vocabulary-preview="${practiceId}"]`).addEventListener("change", event => { previewVocabulary[practiceId] = event.target.value; selectedWords[practiceId] = null; renderPreview(practiceId); });
   const rows = document.querySelector(`[data-vocabulary-rows="${practiceId}"]`);
-  rows.addEventListener("input", event => { const input = event.target.closest("input[data-vocabulary-field]"); if (!input) return; const item = practices[practiceId].substitution.vocabulary.find(value => value.id === input.dataset.itemId); if (!item) return; item[input.dataset.vocabularyField] = input.dataset.vocabularyField === "pinyin" ? cleanPinyin(input.value) : input.value.trim(); if (input.dataset.vocabularyField === "pinyin" && input.value !== item.pinyin) input.value = item.pinyin; const option = document.querySelector(`[data-vocabulary-preview="${practiceId}"] option[value="${CSS.escape(item.id)}"]`); if (option) option.textContent = `${item.hanzi} — ${item.meaning}`; renderPreview(practiceId); saveDraft(); });
+  rows.addEventListener("input", event => { const input = event.target.closest("input[data-vocabulary-field]"); if (!input) return; const item = practices[practiceId].substitution.vocabulary.find(value => value.id === input.dataset.itemId); if (!item) return; item[input.dataset.vocabularyField] = input.dataset.vocabularyField === "pinyin" ? cleanPinyinInput(input.value) : input.value.trim(); if (input.dataset.vocabularyField === "pinyin" && input.value !== item.pinyin) input.value = item.pinyin; const option = document.querySelector(`[data-vocabulary-preview="${practiceId}"] option[value="${CSS.escape(item.id)}"]`); if (option) option.textContent = `${item.hanzi} — ${item.meaning}`; renderPreview(practiceId); saveDraft(); });
+  rows.addEventListener("focusout", event => { const input = event.target.closest('input[data-vocabulary-field="pinyin"]'); if (!input) return; const item = practices[practiceId].substitution.vocabulary.find(value => value.id === input.dataset.itemId); if (!item) return; item.pinyin = cleanPinyin(input.value); input.value = item.pinyin; renderPreview(practiceId); saveDraft(); });
   rows.addEventListener("change", event => { if (!event.target.closest("input[data-vocabulary-field]")) return; renderVocabulary(practiceId); renderPreview(practiceId); });
   rows.addEventListener("click", event => { const button = event.target.closest("button[data-vocabulary-action]"); if (!button) return; const vocabulary = practices[practiceId].substitution.vocabulary; const index = vocabulary.findIndex(item => item.id === button.dataset.itemId); if (index < 0) return; if (button.dataset.vocabularyAction === "delete") vocabulary.splice(index, 1); if (button.dataset.vocabularyAction === "up" && index > 0) [vocabulary[index - 1], vocabulary[index]] = [vocabulary[index], vocabulary[index - 1]]; if (button.dataset.vocabularyAction === "down" && index < vocabulary.length - 1) [vocabulary[index], vocabulary[index + 1]] = [vocabulary[index + 1], vocabulary[index]]; if (!vocabulary.some(item => item.id === previewVocabulary[practiceId])) previewVocabulary[practiceId] = ""; renderVocabulary(practiceId); renderPreview(practiceId); saveDraft(); });
 });
