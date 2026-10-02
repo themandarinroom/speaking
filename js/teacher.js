@@ -349,7 +349,7 @@ async function publishYearLevel(saved = currentSavedPractice, fromLibrary = fals
   finally { isPublishing = false; updatePublishButton(); }
 }
 
-publishBtn.addEventListener("click", publishYearLevel);
+publishBtn.addEventListener("click", () => publishYearLevel());
 savePracticeBtn.addEventListener("click", saveCurrentPractice);
 newPracticeBtn.addEventListener("click", newPractice);
 closeEditorBtn.addEventListener("click", () => { if (!editorDirty || window.confirm(t("discardUnsaved"))) { showEditor(false); currentPracticeId = ""; currentSavedPractice = null; editorDirty = false; updatePublishButton(); } });
