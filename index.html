@@ -3,16 +3,20 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#f8f5ed">
+  <meta name="theme-color" content="#ffffff">
   <title>Mandarin Speaking Practice</title>
-  <link rel="stylesheet" href="css/styles.css">
+  <link rel="icon" href="assets/brand/emblem-header.png" type="image/png">
+  <link rel="stylesheet" href="css/styles.css?v=ui-speaking-1">
 </head>
 <body class="landing-page">
   <header class="landing-site-header">
-    <a class="landing-brand" href="index.html" aria-label="Speaking Practice home">
-      <span class="landing-brand-mark" aria-hidden="true"><svg viewBox="0 0 32 32" role="img"><rect x="10" y="4" width="12" height="17" rx="6"></rect><path d="M7 15.5v1.5a9 9 0 0 0 18 0v-1.5M16 26v3M11 29h10"></path></svg></span>
-      <span class="landing-brand-copy"><strong>The Mandarin Room</strong><small>Speaking Practice</small></span>
-    </a>
+    <div class="tmr-brand">
+      <a class="tmr-emblem-link" href="https://themandarinroom.github.io/vocabularylibrary/" tabindex="-1" aria-hidden="true"><img class="tmr-emblem" src="assets/brand/emblem-header.png" width="56" height="53" alt=""></a>
+      <span class="tmr-brand-text">
+        <a class="tmr-home-link" href="https://themandarinroom.github.io/vocabularylibrary/">The Mandarin Room</a>
+        <a class="tmr-app-link" href="index.html">Speaking Practice</a>
+      </span>
+    </div>
     <section class="landing-auth-panel" aria-label="Teacher account">
       <strong id="homeAuthState" data-i18n="teacherSignInPrompt">Sign in to create and publish speaking practice.</strong>
       <div><button id="homeSignInBtn" class="landing-auth-button" type="button" data-i18n="teacherSignIn">Teacher Sign in</button><button id="homeSignOutBtn" class="landing-auth-button" type="button" hidden data-i18n="signOut">Sign out</button></div>
