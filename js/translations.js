@@ -2,7 +2,7 @@ import { getLanguage, saveLanguage } from "./storage.js";
 
 export const TEXT = {
   en: {
-    appTitle: "Mandarin Speaking Practice", classroomTool: "Classroom tool", homeIntro: "Choose a mode to begin.",
+    appTitle: "Speaking Practice · The Mandarin Room", classroomTool: "Classroom tool", homeIntro: "Choose a mode to begin.",
     teacherMode: "Teacher Mode", studentMode: "Student Mode", teacherModeHelp: "Create Core and Challenge speaking practice.", studentModeHelp: "Choose a year level, listen and record.", teacherSignIn: "Teacher Sign in", teacherSignInPrompt: "Sign in to create and publish speaking practice.",
     yearLevel: "Year level", lessonTitle: "Lesson Title", practiceLabel: "Practice title", corePractice: "Core Practice", challengePractice: "Challenge Practice", coreTeacherRecording: "Core Teacher Voice", challengeTeacherRecording: "Challenge Teacher Voice", chooseYearLevel: "Choose your year level", joinYearLevel: "Open year level", defaultPracticeTitle: "Mandarin speaking practice", signedOut: "Not signed in", signedInAs: "Signed in as", signInHelp: "Sign in to load and publish practices.", signInGoogle: "Sign in", signOut: "Sign out", firebaseSetupNeeded: "Firebase setup is not complete. Add the web configuration before using year levels.", authFailed: "Could not sign in. Please try again.", notAuthorised: "This account is not authorised to publish.", loadingYearLevel: "Loading the published year level…", yearLevelLoaded: "Published year level loaded.", yearLevelEmpty: "No published content exists for this year level yet.",
     privacyShort: "Student recordings stay on this device. Only teacher model audio is cloud-hosted.", backHome: "Home", openStudent: "Open Student Mode", teacherHeading: "Build differentiated speaking practice", teacherIntro: "Add one word unit at a time. Pinyin stays lowercase and has no tone marks.",
@@ -19,7 +19,7 @@ export const TEXT = {
     languageLabel: "Switch to Chinese"
   },
   zh: {
-    appTitle: "中文跟读录音练习", classroomTool: "课堂工具", homeIntro: "请选择使用模式。",
+    appTitle: "中文跟读录音练习 · The Mandarin Room", classroomTool: "课堂工具", homeIntro: "请选择使用模式。",
     teacherMode: "教师模式", studentMode: "学生模式", teacherModeHelp: "创建基础和挑战口语练习。", studentModeHelp: "选择年级，听一听并练录音。", teacherSignIn: "教师登录", teacherSignInPrompt: "登录以创建和发布口语练习。",
     yearLevel: "年级", lessonTitle: "课程标题", practiceLabel: "练习标题", corePractice: "基础练习", challengePractice: "挑战练习", coreTeacherRecording: "基础练习老师录音", challengeTeacherRecording: "挑战练习老师录音", chooseYearLevel: "选择你的年级", joinYearLevel: "打开年级", defaultPracticeTitle: "中文口语练习", signedOut: "尚未登录", signedInAs: "登录账号", signInHelp: "登录以加载和发布练习。", signInGoogle: "登录", signOut: "退出登录", firebaseSetupNeeded: "Firebase 尚未设置完成。请先添加网页配置信息。", authFailed: "无法登录，请再试一次。", notAuthorised: "这个账号没有发布权限。", loadingYearLevel: "正在加载年级练习……", yearLevelLoaded: "已加载年级练习。", yearLevelEmpty: "这个年级还没有已发布的练习。",
     privacyShort: "学生录音只保存在这台设备上。只有老师示范录音会储存在云端。", backHome: "主页", openStudent: "打开学生模式", teacherHeading: "创建分层口语练习", teacherIntro: "每行填写一个词语。拼音使用小写字母，不标声调。",
